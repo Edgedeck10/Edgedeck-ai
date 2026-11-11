@@ -15,7 +15,7 @@ def collect(sports,fetch,parallel,now,cache):
     if now-dt.datetime.fromisoformat(published.replace('Z','+00:00'))>dt.timedelta(days=7):continue
    except (ValueError,TypeError,AttributeError):continue
    teams={str(c.get('team',{}).get('id')) for c in a.get('categories',[]) if isinstance(c.get('team'),dict) and c['team'].get('id') is not None}
-   articles.append({'headline':headline,'description':a.get('description',''),'published':published,'url':url,'team_ids':sorted(teams),'impact_review':bool(re.search(r'\b(injur\w*|out|ruled|suspend\w*|trade\w*|minutes|rest|starting|lineup|return\w*|questionable|doubtful)\b',headline,re.I))})
+   articles.append({'headline':headline,'description':a.get('description',''),'published':published,'url':url,'team_ids':sorted(teams),'impact_review':bool(re.search(r'\b(injur\w*|hurt|sidelined|concussion|illness|ankle|hamstring|wrist|out|ruled|suspend\w*|trade\w*|minutes|rest|starting|lineup|return\w*|questionable|doubtful)\b',headline,re.I))})
   result[s]={'checked_at':now.isoformat(),'status':'Public feed collected','articles':articles}
  cache['news']=result;return result
 
@@ -32,7 +32,7 @@ def review(ticket,rows,events,injuries,news,now):
   if not latest:alerts.append('Original exact line is not on the current board; recheck line and price.')
   elif latest.get('odds') is None:alerts.append('No current observed quote for the original line.')
   elif latest['odds']!=leg.get('odds'):alerts.append(f"Price changed from {leg.get('odds')} to {latest['odds']}; original record is unchanged.")
-  injury=[i for i in injuries if i.get('event_id')==leg['event_id'] and (not leg.get('player_id') or str(i.get('player_id'))==str(leg['player_id']))]
+  injury=[i for i in injuries if i.get('event_id')==leg['event_id']]
   if injury:alerts.append('Availability report requires review: '+', '.join(i['player']+' ('+i['status']+')' for i in injury[:8])+'. Team injury effects are not fully modeled.')
   articles=for_event(event,news)
   if any(a.get('impact_review') for a in articles):alerts.append('Potential lineup, injury or roster news: review linked reports; no unsupported numerical adjustment applied.')
