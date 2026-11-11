@@ -1,5 +1,5 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
-const c={Date,URL,Set,Math,Number,String,report:{recommendations:[]}};vm.createContext(c);vm.runInContext(fs.readFileSync('picks-ui.js','utf8'),c);
+const c={document:{addEventListener:()=>{}},Date,URL,Set,Math,Number,String,report:{recommendations:[]}};vm.createContext(c);vm.runInContext(fs.readFileSync('picks-ui.js','utf8'),c);
 const now=new Date(),r={bookmaker:'FanDuel',fanduel_verified:true,book_state:'IN',quote_source_url:'https://sportsbook.fanduel.com/',odds:-150,odds_updated:now.toISOString(),start:new Date(+now+86400000).toISOString(),fanduel_selection_url:'https://sportsbook.fanduel.com/addToBetslip?marketId=42.test&selectionId=test'};
 assert.equal(c.isFdLeg(r),true);assert.equal(c.isFdLeg({...r,bookmaker:'DraftKings'}),false);assert.equal(c.isFdLeg({...r,book_state:'NJ'}),false);assert.equal(c.isFdLeg({...r,odds_updated:new Date(+now-36*60000).toISOString()}),false);assert.equal(c.isFdTicket({legs:[r,{...r,fanduel_verified:false}]}),false);
 assert.equal(c.fdSelectionUrl(r),r.fanduel_selection_url);assert.equal(c.fdSelectionUrl({...r,fanduel_selection_url:'https://sportsbook.fanduel.com.evil.test/addToBetslip?marketId=a&selectionId=b'}),null);assert.equal(c.fdSelectionUrl({...r,fanduel_selection_url:'https://sportsbook.fanduel.com/'}),null);
