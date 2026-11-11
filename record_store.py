@@ -37,6 +37,17 @@ def normalize_report(report):
 
 
 def write_report(data,report):
+ # Publish only the selected daily slate to phones; full forecast history remains archived.
+ if report.get('selection_days'):
+  from datetime import datetime
+  from zoneinfo import ZoneInfo
+  zone=ZoneInfo('America/Indiana/Indianapolis')
+  def selected(r):
+   try:return datetime.fromisoformat(r['start'].replace('Z','+00:00')).astimezone(zone).date().isoformat()==report['selection_days'].get(r['sport'])
+   except (KeyError,ValueError,TypeError):return False
+  report['recommendations']=[r for r in report['recommendations'] if selected(r)]
+  keys={r.get('log_key') for r in report['recommendations']}
+  report['player_logs']={k:v for k,v in report.get('player_logs',{}).items() if k in keys}
  payload=json.dumps(normalize_report(report),ensure_ascii=False,separators=(',',':'),allow_nan=False).encode()
  zipped=gzip.compress(payload,mtime=0)
  (data/'latest.json.gz').write_bytes(zipped)

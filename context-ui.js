@@ -1,6 +1,6 @@
 /* Current evidence is distinct from frozen selection-time evidence. */
 function pickContext(frozen){
-const current=(report.recommendations||[]).find(r=>r.id===frozen.id),r=current||frozen,c=r.context||r.rationale?.context||{},def=c.opponent_position||{},w=c.weather||{},logs=report.player_logs?.[r.log_key]?.games||[],quoted=r.price_kind==='Observed snapshot'&&r.odds!=null;
+const current=report.rowIndex?.get(frozen.id),r=current||frozen,c=r.context||r.rationale?.context||{},def=c.opponent_position||{},w=c.weather||{},logs=report.player_logs?.[r.log_key]?.games||[],quoted=r.price_kind==='Observed snapshot'&&r.odds!=null;
 const entries=[
 ['Projection',Number.isFinite(r.projection)?fmt(r.projection)+' '+r.market+' versus '+r.side+' '+fmt(r.line)+'; model '+pct(r.probability)+'.':'Projection inputs unavailable.'],
 ['Opportunities & form',r.rate!=null?fmt(r.rate)+' per '+esc(r.exposure_unit||'opportunity')+' × '+fmt(r.expected_exposure)+' expected opportunities. Historical clearing '+pct(r.hit_rate)+'; '+(r.sample||0)+' games.':'Rate/exposure breakdown unavailable. Historical clearing '+pct(r.hit_rate)+'; '+(r.sample||0)+' games.'],

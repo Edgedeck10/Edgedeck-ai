@@ -5,7 +5,18 @@ for(const [id,title] of [['aiparlays','AI projection parlays'],['trends','Histor
 document.getElementById('aiparlays').append(document.getElementById('dailyParlays'));
 document.getElementById('trends').append(document.getElementById('perfectProps'));
 document.getElementById('mobileParlays').dataset.nav='aiparlays';
-const oldGo=go;
-go=function(view){const target=document.getElementById(view);if(!target||!target.classList.contains('view')){toast('This section is unavailable. Please refresh the app.');return}document.body.dataset.discover='all';oldGo(view);target.scrollIntoView({behavior:'smooth',block:'start'});if(view==='aiparlays'&&!document.getElementById('dailyParlays').textContent.trim())document.getElementById('dailyParlays').innerHTML='<p class="fd-status">Loading projection-based parlays. If the feed is unavailable, use Check latest; no sample picks are substituted.</p>';};
+go=function(view){
+const target=document.getElementById(view);
+if(!target||!target.classList.contains('view')){toast('This section is unavailable. Please refresh.');return}
+currentView=view;document.body.dataset.view=view;document.body.dataset.discover='all';
+document.querySelectorAll('.view').forEach(el=>el.hidden=el!==target);
+document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active',b.dataset.nav===view));
+target.scrollIntoView({block:'start',behavior:'auto'});
+requestAnimationFrame(()=>{try{
+if(view==='allpicks')renderPicksHub();
+if(view==='history'){if(!historyLoaded)loadHistory();else renderHistory();if(!dailyLoaded)loadDailyRecords();else renderDailyRecords()}
+if(view==='parlay')renderSlip();if(view==='matchups')renderGames();if(view==='data')renderHealth();
+}catch(error){toast('This section could not render. Try Check latest. '+error.message);console.error(error)}})
+};
 document.addEventListener('click',e=>{const b=e.target.closest('[data-nav],#mobileParlays,[data-discover]');if(!b)return;e.preventDefault();e.stopImmediatePropagation();const v=b.dataset.nav||({all:'allpicks',picks:'allpicks',parlays:'aiparlays',trends:'trends'}[b.dataset.discover]);go(v)},true);
 })();
