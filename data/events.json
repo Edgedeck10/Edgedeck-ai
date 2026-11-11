@@ -1,0 +1,2039 @@
+{
+  "NBA:401909945": {
+    "id": "NBA:401909945",
+    "sport": "NBA",
+    "event": "Philadelphia 76ers at Chicago Bulls",
+    "start": "2026-11-08T20:30Z",
+    "home": {
+      "id": "4",
+      "name": "Chicago Bulls",
+      "score": 121,
+      "record": "1-8"
+    },
+    "away": {
+      "id": "20",
+      "name": "Philadelphia 76ers",
+      "score": 127,
+      "record": "9-2"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NBA:401909946": {
+    "id": "NBA:401909946",
+    "sport": "NBA",
+    "event": "Los Angeles Lakers at Detroit Pistons",
+    "start": "2026-11-08T23:00Z",
+    "home": {
+      "id": "8",
+      "name": "Detroit Pistons",
+      "score": 116,
+      "record": "6-3"
+    },
+    "away": {
+      "id": "13",
+      "name": "Los Angeles Lakers",
+      "score": 121,
+      "record": "9-2"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NBA:401909947": {
+    "id": "NBA:401909947",
+    "sport": "NBA",
+    "event": "Utah Jazz at Minnesota Timberwolves",
+    "start": "2026-11-09T00:00Z",
+    "home": {
+      "id": "16",
+      "name": "Minnesota Timberwolves",
+      "score": 115,
+      "record": "8-3"
+    },
+    "away": {
+      "id": "26",
+      "name": "Utah Jazz",
+      "score": 100,
+      "record": "1-9"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NBA:401909948": {
+    "id": "NBA:401909948",
+    "sport": "NBA",
+    "event": "Brooklyn Nets at Dallas Mavericks",
+    "start": "2026-11-09T00:30Z",
+    "home": {
+      "id": "6",
+      "name": "Dallas Mavericks",
+      "score": 130,
+      "record": "6-4"
+    },
+    "away": {
+      "id": "17",
+      "name": "Brooklyn Nets",
+      "score": 93,
+      "record": "2-8"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NBA:401909949": {
+    "id": "NBA:401909949",
+    "sport": "NBA",
+    "event": "Boston Celtics at Milwaukee Bucks",
+    "start": "2026-11-09T01:00Z",
+    "home": {
+      "id": "15",
+      "name": "Milwaukee Bucks",
+      "score": 97,
+      "record": "1-9"
+    },
+    "away": {
+      "id": "2",
+      "name": "Boston Celtics",
+      "score": 117,
+      "record": "8-2"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NBA:401909950": {
+    "id": "NBA:401909950",
+    "sport": "NBA",
+    "event": "New Orleans Pelicans at LA Clippers",
+    "start": "2026-11-09T02:00Z",
+    "home": {
+      "id": "12",
+      "name": "LA Clippers",
+      "score": 139,
+      "record": "2-7"
+    },
+    "away": {
+      "id": "3",
+      "name": "New Orleans Pelicans",
+      "score": 123,
+      "record": "4-6"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NBA:401909951": {
+    "id": "NBA:401909951",
+    "sport": "NBA",
+    "event": "Miami Heat at Sacramento Kings",
+    "start": "2026-11-09T02:00Z",
+    "home": {
+      "id": "23",
+      "name": "Sacramento Kings",
+      "score": 108,
+      "record": "1-9"
+    },
+    "away": {
+      "id": "14",
+      "name": "Miami Heat",
+      "score": 114,
+      "record": "4-6"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NFL:401873038": {
+    "id": "NFL:401873038",
+    "sport": "NFL",
+    "event": "Cincinnati Bengals at Atlanta Falcons",
+    "start": "2026-11-08T14:30Z",
+    "home": {
+      "id": "1",
+      "name": "Atlanta Falcons",
+      "score": 17,
+      "record": "3-6"
+    },
+    "away": {
+      "id": "4",
+      "name": "Cincinnati Bengals",
+      "score": 34,
+      "record": "6-2"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NFL:401873040": {
+    "id": "NFL:401873040",
+    "sport": "NFL",
+    "event": "Dallas Cowboys at Indianapolis Colts",
+    "start": "2026-11-08T18:00Z",
+    "home": {
+      "id": "11",
+      "name": "Indianapolis Colts",
+      "score": 23,
+      "record": "2-7"
+    },
+    "away": {
+      "id": "6",
+      "name": "Dallas Cowboys",
+      "score": 27,
+      "record": "4-5"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NFL:401873045": {
+    "id": "NFL:401873045",
+    "sport": "NFL",
+    "event": "New York Jets at Kansas City Chiefs",
+    "start": "2026-11-08T18:00Z",
+    "home": {
+      "id": "12",
+      "name": "Kansas City Chiefs",
+      "score": 35,
+      "record": "6-2"
+    },
+    "away": {
+      "id": "20",
+      "name": "New York Jets",
+      "score": 12,
+      "record": "2-7"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NFL:401873042": {
+    "id": "NFL:401873042",
+    "sport": "NFL",
+    "event": "Detroit Lions at Miami Dolphins",
+    "start": "2026-11-08T18:00Z",
+    "home": {
+      "id": "15",
+      "name": "Miami Dolphins",
+      "score": 9,
+      "record": "1-7"
+    },
+    "away": {
+      "id": "8",
+      "name": "Detroit Lions",
+      "score": 19,
+      "record": "6-2"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NFL:401873039": {
+    "id": "NFL:401873039",
+    "sport": "NFL",
+    "event": "Cleveland Browns at New Orleans Saints",
+    "start": "2026-11-08T18:00Z",
+    "home": {
+      "id": "18",
+      "name": "New Orleans Saints",
+      "score": 23,
+      "record": "3-5"
+    },
+    "away": {
+      "id": "5",
+      "name": "Cleveland Browns",
+      "score": 22,
+      "record": "5-4"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NFL:401873044": {
+    "id": "NFL:401873044",
+    "sport": "NFL",
+    "event": "New York Giants at Philadelphia Eagles",
+    "start": "2026-11-08T18:00Z",
+    "home": {
+      "id": "21",
+      "name": "Philadelphia Eagles",
+      "score": 11,
+      "record": "2-7"
+    },
+    "away": {
+      "id": "19",
+      "name": "New York Giants",
+      "score": 19,
+      "record": "5-2-1"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NFL:401873043": {
+    "id": "NFL:401873043",
+    "sport": "NFL",
+    "event": "Los Angeles Rams at Washington Commanders",
+    "start": "2026-11-08T18:00Z",
+    "home": {
+      "id": "28",
+      "name": "Washington Commanders",
+      "score": 13,
+      "record": "2-5-1"
+    },
+    "away": {
+      "id": "14",
+      "name": "Los Angeles Rams",
+      "score": 20,
+      "record": "5-4"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NFL:401873041": {
+    "id": "NFL:401873041",
+    "sport": "NFL",
+    "event": "Denver Broncos at Carolina Panthers",
+    "start": "2026-11-08T18:00Z",
+    "home": {
+      "id": "29",
+      "name": "Carolina Panthers",
+      "score": 21,
+      "record": "3-5"
+    },
+    "away": {
+      "id": "7",
+      "name": "Denver Broncos",
+      "score": 26,
+      "record": "7-2"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NFL:401873046": {
+    "id": "NFL:401873046",
+    "sport": "NFL",
+    "event": "Houston Texans at Los Angeles Chargers",
+    "start": "2026-11-08T21:05Z",
+    "home": {
+      "id": "24",
+      "name": "Los Angeles Chargers",
+      "score": 22,
+      "record": "0-8"
+    },
+    "away": {
+      "id": "34",
+      "name": "Houston Texans",
+      "score": 44,
+      "record": "3-5"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NFL:401873049": {
+    "id": "NFL:401873049",
+    "sport": "NFL",
+    "event": "Green Bay Packers at New England Patriots",
+    "start": "2026-11-08T21:25Z",
+    "home": {
+      "id": "17",
+      "name": "New England Patriots",
+      "score": 27,
+      "record": "5-4"
+    },
+    "away": {
+      "id": "9",
+      "name": "Green Bay Packers",
+      "score": 45,
+      "record": "6-3"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NFL:401873047": {
+    "id": "NFL:401873047",
+    "sport": "NFL",
+    "event": "Las Vegas Raiders at San Francisco 49ers",
+    "start": "2026-11-08T21:25Z",
+    "home": {
+      "id": "25",
+      "name": "San Francisco 49ers",
+      "score": 38,
+      "record": "7-1"
+    },
+    "away": {
+      "id": "13",
+      "name": "Las Vegas Raiders",
+      "score": 17,
+      "record": "4-5"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NFL:401873048": {
+    "id": "NFL:401873048",
+    "sport": "NFL",
+    "event": "Arizona Cardinals at Seattle Seahawks",
+    "start": "2026-11-08T21:25Z",
+    "home": {
+      "id": "26",
+      "name": "Seattle Seahawks",
+      "score": 17,
+      "record": "5-4"
+    },
+    "away": {
+      "id": "22",
+      "name": "Arizona Cardinals",
+      "score": 3,
+      "record": "3-6"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NFL:401873050": {
+    "id": "NFL:401873050",
+    "sport": "NFL",
+    "event": "Tampa Bay Buccaneers at Chicago Bears",
+    "start": "2026-11-09T01:20Z",
+    "home": {
+      "id": "3",
+      "name": "Chicago Bears",
+      "score": 27,
+      "record": "7-2"
+    },
+    "away": {
+      "id": "27",
+      "name": "Tampa Bay Buccaneers",
+      "score": 24,
+      "record": "3-6"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NHL:401892674": {
+    "id": "NHL:401892674",
+    "sport": "NHL",
+    "event": "Florida Panthers at Boston Bruins",
+    "start": "2026-11-08T18:00Z",
+    "home": {
+      "id": "1",
+      "name": "Boston Bruins",
+      "score": 4,
+      "record": ""
+    },
+    "away": {
+      "id": "26",
+      "name": "Florida Panthers",
+      "score": 1,
+      "record": ""
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NHL:401892675": {
+    "id": "NHL:401892675",
+    "sport": "NHL",
+    "event": "Vegas Golden Knights at Buffalo Sabres",
+    "start": "2026-11-08T20:30Z",
+    "home": {
+      "id": "2",
+      "name": "Buffalo Sabres",
+      "score": 1,
+      "record": ""
+    },
+    "away": {
+      "id": "37",
+      "name": "Vegas Golden Knights",
+      "score": 4,
+      "record": ""
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NHL:401892677": {
+    "id": "NHL:401892677",
+    "sport": "NHL",
+    "event": "Tampa Bay Lightning at Winnipeg Jets",
+    "start": "2026-11-08T23:00Z",
+    "home": {
+      "id": "28",
+      "name": "Winnipeg Jets",
+      "score": 4,
+      "record": ""
+    },
+    "away": {
+      "id": "20",
+      "name": "Tampa Bay Lightning",
+      "score": 3,
+      "record": ""
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NHL:401892676": {
+    "id": "NHL:401892676",
+    "sport": "NHL",
+    "event": "New Jersey Devils at Toronto Maple Leafs",
+    "start": "2026-11-09T00:00Z",
+    "home": {
+      "id": "21",
+      "name": "Toronto Maple Leafs",
+      "score": 0,
+      "record": ""
+    },
+    "away": {
+      "id": "11",
+      "name": "New Jersey Devils",
+      "score": 4,
+      "record": ""
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NHL:401892678": {
+    "id": "NHL:401892678",
+    "sport": "NHL",
+    "event": "Philadelphia Flyers at Calgary Flames",
+    "start": "2026-11-09T00:00Z",
+    "home": {
+      "id": "3",
+      "name": "Calgary Flames",
+      "score": 4,
+      "record": ""
+    },
+    "away": {
+      "id": "15",
+      "name": "Philadelphia Flyers",
+      "score": 3,
+      "record": ""
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NHL:401892679": {
+    "id": "NHL:401892679",
+    "sport": "NHL",
+    "event": "Pittsburgh Penguins at Anaheim Ducks",
+    "start": "2026-11-09T01:00Z",
+    "home": {
+      "id": "25",
+      "name": "Anaheim Ducks",
+      "score": 5,
+      "record": ""
+    },
+    "away": {
+      "id": "16",
+      "name": "Pittsburgh Penguins",
+      "score": 2,
+      "record": ""
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NCAAB:401920424": {
+    "id": "NCAAB:401920424",
+    "sport": "NCAAB",
+    "event": "Arkansas Razorbacks at Virginia Cavaliers",
+    "start": "2026-11-08T18:00Z",
+    "home": {
+      "id": "258",
+      "name": "Virginia Cavaliers",
+      "score": 91,
+      "record": "3-0"
+    },
+    "away": {
+      "id": "8",
+      "name": "Arkansas Razorbacks",
+      "score": 72,
+      "record": "1-1"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NCAAB:401918053": {
+    "id": "NCAAB:401918053",
+    "sport": "NCAAB",
+    "event": "California Golden Bears at Houston Cougars",
+    "start": "2026-11-09T01:30Z",
+    "home": {
+      "id": "248",
+      "name": "Houston Cougars",
+      "score": 86,
+      "record": "2-0"
+    },
+    "away": {
+      "id": "25",
+      "name": "California Golden Bears",
+      "score": 68,
+      "record": "2-1"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NCAAB:401924646": {
+    "id": "NCAAB:401924646",
+    "sport": "NCAAB",
+    "event": "Iona Gaels at St. John's Red Storm",
+    "start": "2026-11-08T17:00Z",
+    "home": {
+      "id": "2599",
+      "name": "St. John's Red Storm",
+      "score": 104,
+      "record": "2-0"
+    },
+    "away": {
+      "id": "314",
+      "name": "Iona Gaels",
+      "score": 65,
+      "record": "2-1"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NCAAB:401919029": {
+    "id": "NCAAB:401919029",
+    "sport": "NCAAB",
+    "event": "Wichita State Shockers at USC Trojans",
+    "start": "2026-11-09T04:00Z",
+    "home": {
+      "id": "30",
+      "name": "USC Trojans",
+      "score": 93,
+      "record": "2-0"
+    },
+    "away": {
+      "id": "2724",
+      "name": "Wichita State Shockers",
+      "score": 86,
+      "record": "1-1"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-08"
+  },
+  "NBA:401909952": {
+    "id": "NBA:401909952",
+    "sport": "NBA",
+    "event": "Los Angeles Lakers at Atlanta Hawks",
+    "start": "2026-11-10T00:00Z",
+    "home": {
+      "id": "1",
+      "name": "Atlanta Hawks",
+      "score": 114,
+      "record": "7-5"
+    },
+    "away": {
+      "id": "13",
+      "name": "Los Angeles Lakers",
+      "score": 124,
+      "record": "10-2"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-09"
+  },
+  "NBA:401909953": {
+    "id": "NBA:401909953",
+    "sport": "NBA",
+    "event": "Cleveland Cavaliers at Charlotte Hornets",
+    "start": "2026-11-10T00:00Z",
+    "home": {
+      "id": "30",
+      "name": "Charlotte Hornets",
+      "score": 124,
+      "record": "4-7"
+    },
+    "away": {
+      "id": "5",
+      "name": "Cleveland Cavaliers",
+      "score": 112,
+      "record": "5-6"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-09"
+  },
+  "NBA:401909954": {
+    "id": "NBA:401909954",
+    "sport": "NBA",
+    "event": "Washington Wizards at Detroit Pistons",
+    "start": "2026-11-10T00:00Z",
+    "home": {
+      "id": "8",
+      "name": "Detroit Pistons",
+      "score": 122,
+      "record": "7-3"
+    },
+    "away": {
+      "id": "27",
+      "name": "Washington Wizards",
+      "score": 111,
+      "record": "4-7"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-09"
+  },
+  "NBA:401909955": {
+    "id": "NBA:401909955",
+    "sport": "NBA",
+    "event": "Memphis Grizzlies at Toronto Raptors",
+    "start": "2026-11-10T00:30Z",
+    "home": {
+      "id": "28",
+      "name": "Toronto Raptors",
+      "score": 102,
+      "record": "5-5"
+    },
+    "away": {
+      "id": "29",
+      "name": "Memphis Grizzlies",
+      "score": 118,
+      "record": "7-3"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-09"
+  },
+  "NBA:401909956": {
+    "id": "NBA:401909956",
+    "sport": "NBA",
+    "event": "Indiana Pacers at Dallas Mavericks",
+    "start": "2026-11-10T01:00Z",
+    "home": {
+      "id": "6",
+      "name": "Dallas Mavericks",
+      "score": 125,
+      "record": "7-4"
+    },
+    "away": {
+      "id": "11",
+      "name": "Indiana Pacers",
+      "score": 122,
+      "record": "3-8"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-09"
+  },
+  "NBA:401909957": {
+    "id": "NBA:401909957",
+    "sport": "NBA",
+    "event": "Denver Nuggets at Houston Rockets",
+    "start": "2026-11-10T01:30Z",
+    "home": {
+      "id": "10",
+      "name": "Houston Rockets",
+      "score": 110,
+      "record": "8-3"
+    },
+    "away": {
+      "id": "7",
+      "name": "Denver Nuggets",
+      "score": 100,
+      "record": "5-4"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-09"
+  },
+  "NBA:401909958": {
+    "id": "NBA:401909958",
+    "sport": "NBA",
+    "event": "San Antonio Spurs at Phoenix Suns",
+    "start": "2026-11-10T02:00Z",
+    "home": {
+      "id": "21",
+      "name": "Phoenix Suns",
+      "score": 96,
+      "record": "3-6"
+    },
+    "away": {
+      "id": "24",
+      "name": "San Antonio Spurs",
+      "score": 122,
+      "record": "9-2"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-09"
+  },
+  "NBA:401909959": {
+    "id": "NBA:401909959",
+    "sport": "NBA",
+    "event": "New Orleans Pelicans at Golden State Warriors",
+    "start": "2026-11-10T03:00Z",
+    "home": {
+      "id": "9",
+      "name": "Golden State Warriors",
+      "score": 138,
+      "record": "8-3"
+    },
+    "away": {
+      "id": "3",
+      "name": "New Orleans Pelicans",
+      "score": 87,
+      "record": "4-7"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-09"
+  },
+  "NFL:401873051": {
+    "id": "NFL:401873051",
+    "sport": "NFL",
+    "event": "Buffalo Bills at Minnesota Vikings",
+    "start": "2026-11-10T01:15Z",
+    "home": {
+      "id": "16",
+      "name": "Minnesota Vikings",
+      "score": 6,
+      "record": "6-2"
+    },
+    "away": {
+      "id": "2",
+      "name": "Buffalo Bills",
+      "score": 23,
+      "record": "7-1"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-09"
+  },
+  "NHL:401892680": {
+    "id": "NHL:401892680",
+    "sport": "NHL",
+    "event": "New York Rangers at Edmonton Oilers",
+    "start": "2026-11-10T01:00Z",
+    "home": {
+      "id": "6",
+      "name": "Edmonton Oilers",
+      "score": 3,
+      "record": ""
+    },
+    "away": {
+      "id": "13",
+      "name": "New York Rangers",
+      "score": 1,
+      "record": ""
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-09"
+  },
+  "NHL:401892681": {
+    "id": "NHL:401892681",
+    "sport": "NHL",
+    "event": "Philadelphia Flyers at Vancouver Canucks",
+    "start": "2026-11-10T02:30Z",
+    "home": {
+      "id": "22",
+      "name": "Vancouver Canucks",
+      "score": 1,
+      "record": ""
+    },
+    "away": {
+      "id": "15",
+      "name": "Philadelphia Flyers",
+      "score": 3,
+      "record": ""
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-09"
+  },
+  "NHL:401892682": {
+    "id": "NHL:401892682",
+    "sport": "NHL",
+    "event": "New York Islanders at San Jose Sharks",
+    "start": "2026-11-10T03:00Z",
+    "home": {
+      "id": "18",
+      "name": "San Jose Sharks",
+      "score": 3,
+      "record": ""
+    },
+    "away": {
+      "id": "12",
+      "name": "New York Islanders",
+      "score": 2,
+      "record": ""
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-09"
+  },
+  "NCAAB:401920686": {
+    "id": "NCAAB:401920686",
+    "sport": "NCAAB",
+    "event": "Wagner Seahawks at UConn Huskies",
+    "start": "2026-11-10T00:00Z",
+    "home": {
+      "id": "41",
+      "name": "UConn Huskies",
+      "score": 83,
+      "record": "3-0"
+    },
+    "away": {
+      "id": "2681",
+      "name": "Wagner Seahawks",
+      "score": 41,
+      "record": "0-3"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-09"
+  },
+  "NCAAB:401906865": {
+    "id": "NCAAB:401906865",
+    "sport": "NCAAB",
+    "event": "Grambling Tigers at Texas Longhorns",
+    "start": "2026-11-10T00:00Z",
+    "home": {
+      "id": "251",
+      "name": "Texas Longhorns",
+      "score": 93,
+      "record": "3-0"
+    },
+    "away": {
+      "id": "2755",
+      "name": "Grambling Tigers",
+      "score": 62,
+      "record": "1-1"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-09"
+  },
+  "NCAAB:401906849": {
+    "id": "NCAAB:401906849",
+    "sport": "NCAAB",
+    "event": "Radford Highlanders at Tennessee Volunteers",
+    "start": "2026-11-10T00:00Z",
+    "home": {
+      "id": "2633",
+      "name": "Tennessee Volunteers",
+      "score": 70,
+      "record": "2-0"
+    },
+    "away": {
+      "id": "2515",
+      "name": "Radford Highlanders",
+      "score": 47,
+      "record": "0-3"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-09"
+  },
+  "NCAAB:401921720": {
+    "id": "NCAAB:401921720",
+    "sport": "NCAAB",
+    "event": "North Florida Ospreys at Miami Hurricanes",
+    "start": "2026-11-10T00:00Z",
+    "home": {
+      "id": "2390",
+      "name": "Miami Hurricanes",
+      "score": 89,
+      "record": "2-1"
+    },
+    "away": {
+      "id": "2454",
+      "name": "North Florida Ospreys",
+      "score": 51,
+      "record": "1-2"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-09"
+  },
+  "NCAAB:401906759": {
+    "id": "NCAAB:401906759",
+    "sport": "NCAAB",
+    "event": "Oakland Golden Grizzlies at Alabama Crimson Tide",
+    "start": "2026-11-10T00:30Z",
+    "home": {
+      "id": "333",
+      "name": "Alabama Crimson Tide",
+      "score": 109,
+      "record": "3-0"
+    },
+    "away": {
+      "id": "2473",
+      "name": "Oakland Golden Grizzlies",
+      "score": 68,
+      "record": "0-4"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-09"
+  },
+  "NBA:401909960": {
+    "id": "NBA:401909960",
+    "sport": "NBA",
+    "event": "Milwaukee Bucks at New York Knicks",
+    "start": "2026-11-11T00:30Z",
+    "home": {
+      "id": "18",
+      "name": "New York Knicks",
+      "score": 117,
+      "record": "6-4"
+    },
+    "away": {
+      "id": "15",
+      "name": "Milwaukee Bucks",
+      "score": 85,
+      "record": "1-10"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-10"
+  },
+  "NBA:401909961": {
+    "id": "NBA:401909961",
+    "sport": "NBA",
+    "event": "Boston Celtics at Philadelphia 76ers",
+    "start": "2026-11-11T01:00Z",
+    "home": {
+      "id": "20",
+      "name": "Philadelphia 76ers",
+      "score": null,
+      "record": "9-2"
+    },
+    "away": {
+      "id": "2",
+      "name": "Boston Celtics",
+      "score": null,
+      "record": "8-2"
+    },
+    "final": false,
+    "status": "In Progress",
+    "day": "2026-11-10"
+  },
+  "NBA:401909962": {
+    "id": "NBA:401909962",
+    "sport": "NBA",
+    "event": "LA Clippers at Phoenix Suns",
+    "start": "2026-11-11T02:00Z",
+    "home": {
+      "id": "21",
+      "name": "Phoenix Suns",
+      "score": null,
+      "record": "3-6"
+    },
+    "away": {
+      "id": "12",
+      "name": "LA Clippers",
+      "score": null,
+      "record": "2-7"
+    },
+    "final": false,
+    "status": "Halftime",
+    "day": "2026-11-10"
+  },
+  "NBA:401909963": {
+    "id": "NBA:401909963",
+    "sport": "NBA",
+    "event": "Miami Heat at Utah Jazz",
+    "start": "2026-11-11T02:00Z",
+    "home": {
+      "id": "26",
+      "name": "Utah Jazz",
+      "score": null,
+      "record": "1-9"
+    },
+    "away": {
+      "id": "14",
+      "name": "Miami Heat",
+      "score": null,
+      "record": "4-6"
+    },
+    "final": false,
+    "status": "In Progress",
+    "day": "2026-11-10"
+  },
+  "NBA:401909964": {
+    "id": "NBA:401909964",
+    "sport": "NBA",
+    "event": "Orlando Magic at Sacramento Kings",
+    "start": "2026-11-11T03:00Z",
+    "home": {
+      "id": "23",
+      "name": "Sacramento Kings",
+      "score": null,
+      "record": "1-9"
+    },
+    "away": {
+      "id": "19",
+      "name": "Orlando Magic",
+      "score": null,
+      "record": "2-7"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-10"
+  },
+  "NBA:401909965": {
+    "id": "NBA:401909965",
+    "sport": "NBA",
+    "event": "Oklahoma City Thunder at Portland Trail Blazers",
+    "start": "2026-11-11T04:00Z",
+    "home": {
+      "id": "22",
+      "name": "Portland Trail Blazers",
+      "score": null,
+      "record": "6-3"
+    },
+    "away": {
+      "id": "25",
+      "name": "Oklahoma City Thunder",
+      "score": null,
+      "record": "8-2"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-10"
+  },
+  "NHL:401892683": {
+    "id": "NHL:401892683",
+    "sport": "NHL",
+    "event": "Colorado Avalanche at Toronto Maple Leafs",
+    "start": "2026-11-11T00:00Z",
+    "home": {
+      "id": "21",
+      "name": "Toronto Maple Leafs",
+      "score": 3,
+      "record": ""
+    },
+    "away": {
+      "id": "17",
+      "name": "Colorado Avalanche",
+      "score": 6,
+      "record": ""
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-10"
+  },
+  "NHL:401892684": {
+    "id": "NHL:401892684",
+    "sport": "NHL",
+    "event": "Minnesota Wild at Montreal Canadiens",
+    "start": "2026-11-11T00:00Z",
+    "home": {
+      "id": "10",
+      "name": "Montreal Canadiens",
+      "score": 1,
+      "record": ""
+    },
+    "away": {
+      "id": "30",
+      "name": "Minnesota Wild",
+      "score": 2,
+      "record": ""
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-10"
+  },
+  "NHL:401892685": {
+    "id": "NHL:401892685",
+    "sport": "NHL",
+    "event": "Washington Capitals at Ottawa Senators",
+    "start": "2026-11-11T00:00Z",
+    "home": {
+      "id": "14",
+      "name": "Ottawa Senators",
+      "score": 2,
+      "record": ""
+    },
+    "away": {
+      "id": "23",
+      "name": "Washington Capitals",
+      "score": 3,
+      "record": ""
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-10"
+  },
+  "NHL:401892688": {
+    "id": "NHL:401892688",
+    "sport": "NHL",
+    "event": "New Jersey Devils at Winnipeg Jets",
+    "start": "2026-11-11T00:00Z",
+    "home": {
+      "id": "28",
+      "name": "Winnipeg Jets",
+      "score": 4,
+      "record": ""
+    },
+    "away": {
+      "id": "11",
+      "name": "New Jersey Devils",
+      "score": 2,
+      "record": ""
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-10"
+  },
+  "NHL:401892686": {
+    "id": "NHL:401892686",
+    "sport": "NHL",
+    "event": "Florida Panthers at Columbus Blue Jackets",
+    "start": "2026-11-11T00:30Z",
+    "home": {
+      "id": "29",
+      "name": "Columbus Blue Jackets",
+      "score": null,
+      "record": "7-8-0"
+    },
+    "away": {
+      "id": "26",
+      "name": "Florida Panthers",
+      "score": null,
+      "record": "9-7-2"
+    },
+    "final": false,
+    "status": "In Progress",
+    "day": "2026-11-10"
+  },
+  "NHL:401892687": {
+    "id": "NHL:401892687",
+    "sport": "NHL",
+    "event": "Detroit Red Wings at St. Louis Blues",
+    "start": "2026-11-11T01:00Z",
+    "home": {
+      "id": "19",
+      "name": "St. Louis Blues",
+      "score": null,
+      "record": "7-8-2"
+    },
+    "away": {
+      "id": "5",
+      "name": "Detroit Red Wings",
+      "score": null,
+      "record": "7-8-3"
+    },
+    "final": false,
+    "status": "In Progress",
+    "day": "2026-11-10"
+  },
+  "NHL:401892689": {
+    "id": "NHL:401892689",
+    "sport": "NHL",
+    "event": "Nashville Predators at Los Angeles Kings",
+    "start": "2026-11-11T03:00Z",
+    "home": {
+      "id": "8",
+      "name": "Los Angeles Kings",
+      "score": null,
+      "record": "5-8-2"
+    },
+    "away": {
+      "id": "27",
+      "name": "Nashville Predators",
+      "score": null,
+      "record": "8-4-5"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-10"
+  },
+  "NCAAF:401866458": {
+    "id": "NCAAF:401866458",
+    "sport": "NCAAF",
+    "event": "Western Michigan Broncos at Akron Zips",
+    "start": "2026-11-11T00:00Z",
+    "home": {
+      "id": "2006",
+      "name": "Akron Zips",
+      "score": 14,
+      "record": "1-9"
+    },
+    "away": {
+      "id": "2711",
+      "name": "Western Michigan Broncos",
+      "score": 42,
+      "record": "7-3"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-10"
+  },
+  "NCAAF:401866459": {
+    "id": "NCAAF:401866459",
+    "sport": "NCAAF",
+    "event": "Kent State Golden Flashes at Bowling Green Falcons",
+    "start": "2026-11-11T00:00Z",
+    "home": {
+      "id": "189",
+      "name": "Bowling Green Falcons",
+      "score": null,
+      "record": "2-7"
+    },
+    "away": {
+      "id": "2309",
+      "name": "Kent State Golden Flashes",
+      "score": null,
+      "record": "3-6"
+    },
+    "final": false,
+    "status": "In Progress",
+    "day": "2026-11-10"
+  },
+  "NCAAF:401866460": {
+    "id": "NCAAF:401866460",
+    "sport": "NCAAF",
+    "event": "Ohio Bobcats at Miami (OH) RedHawks",
+    "start": "2026-11-11T01:00Z",
+    "home": {
+      "id": "193",
+      "name": "Miami (OH) RedHawks",
+      "score": null,
+      "record": "5-4"
+    },
+    "away": {
+      "id": "195",
+      "name": "Ohio Bobcats",
+      "score": null,
+      "record": "7-2"
+    },
+    "final": false,
+    "status": "Halftime",
+    "day": "2026-11-10"
+  },
+  "NCAAB:401913527": {
+    "id": "NCAAB:401913527",
+    "sport": "NCAAB",
+    "event": "Illinois Fighting Illini at Texas Tech Red Raiders",
+    "start": "2026-11-11T01:00Z",
+    "home": {
+      "id": "2641",
+      "name": "Texas Tech Red Raiders",
+      "score": null,
+      "record": "2-0"
+    },
+    "away": {
+      "id": "356",
+      "name": "Illinois Fighting Illini",
+      "score": null,
+      "record": "2-0"
+    },
+    "final": false,
+    "status": "In Progress",
+    "day": "2026-11-10"
+  },
+  "NCAAB:401920425": {
+    "id": "NCAAB:401920425",
+    "sport": "NCAAB",
+    "event": "Bucknell Bison at Virginia Cavaliers",
+    "start": "2026-11-11T02:00Z",
+    "home": {
+      "id": "258",
+      "name": "Virginia Cavaliers",
+      "score": null,
+      "record": "3-0"
+    },
+    "away": {
+      "id": "2083",
+      "name": "Bucknell Bison",
+      "score": null,
+      "record": "0-2"
+    },
+    "final": false,
+    "status": "Halftime",
+    "day": "2026-11-10"
+  },
+  "NCAAB:401909740": {
+    "id": "NCAAB:401909740",
+    "sport": "NCAAB",
+    "event": "Northern Arizona Lumberjacks at Arizona Wildcats",
+    "start": "2026-11-11T02:00Z",
+    "home": {
+      "id": "12",
+      "name": "Arizona Wildcats",
+      "score": null,
+      "record": "1-1"
+    },
+    "away": {
+      "id": "2464",
+      "name": "Northern Arizona Lumberjacks",
+      "score": null,
+      "record": "0-2"
+    },
+    "final": false,
+    "status": "In Progress",
+    "day": "2026-11-10"
+  },
+  "NCAAB:401909786": {
+    "id": "NCAAB:401909786",
+    "sport": "NCAAB",
+    "event": "Kansas Jayhawks at Kentucky Wildcats",
+    "start": "2026-11-11T02:58Z",
+    "home": {
+      "id": "96",
+      "name": "Kentucky Wildcats",
+      "score": null,
+      "record": "2-0"
+    },
+    "away": {
+      "id": "2305",
+      "name": "Kansas Jayhawks",
+      "score": null,
+      "record": "2-0"
+    },
+    "final": false,
+    "status": "In Progress",
+    "day": "2026-11-10"
+  },
+  "NCAAB:401921740": {
+    "id": "NCAAB:401921740",
+    "sport": "NCAAB",
+    "event": "Queens University Royals at BYU Cougars",
+    "start": "2026-11-11T02:00Z",
+    "home": {
+      "id": "252",
+      "name": "BYU Cougars",
+      "score": null,
+      "record": "2-0"
+    },
+    "away": {
+      "id": "2511",
+      "name": "Queens University Royals",
+      "score": null,
+      "record": "2-1"
+    },
+    "final": false,
+    "status": "In Progress",
+    "day": "2026-11-10"
+  },
+  "NCAAB:401906771": {
+    "id": "NCAAB:401906771",
+    "sport": "NCAAB",
+    "event": "Florida Gators at Florida State Seminoles",
+    "start": "2026-11-10T23:00Z",
+    "home": {
+      "id": "52",
+      "name": "Florida State Seminoles",
+      "score": 72,
+      "record": "2-1"
+    },
+    "away": {
+      "id": "57",
+      "name": "Florida Gators",
+      "score": 81,
+      "record": "3-0"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-10"
+  },
+  "NCAAB:401909564": {
+    "id": "NCAAB:401909564",
+    "sport": "NCAAB",
+    "event": "Michigan State Spartans at Duke Blue Devils",
+    "start": "2026-11-11T00:00Z",
+    "home": {
+      "id": "150",
+      "name": "Duke Blue Devils",
+      "score": 73,
+      "record": "2-1"
+    },
+    "away": {
+      "id": "127",
+      "name": "Michigan State Spartans",
+      "score": 79,
+      "record": "3-0"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-10"
+  },
+  "NCAAB:401918987": {
+    "id": "NCAAB:401918987",
+    "sport": "NCAAB",
+    "event": "Memphis Tigers at Vanderbilt Commodores",
+    "start": "2026-11-11T00:15Z",
+    "home": {
+      "id": "238",
+      "name": "Vanderbilt Commodores",
+      "score": 105,
+      "record": "3-0"
+    },
+    "away": {
+      "id": "235",
+      "name": "Memphis Tigers",
+      "score": 81,
+      "record": "2-1"
+    },
+    "final": true,
+    "status": "Final",
+    "day": "2026-11-10"
+  },
+  "NBA:401909966": {
+    "id": "NBA:401909966",
+    "sport": "NBA",
+    "event": "Washington Wizards at Indiana Pacers",
+    "start": "2026-11-12T00:00Z",
+    "home": {
+      "id": "11",
+      "name": "Indiana Pacers",
+      "score": null,
+      "record": "3-8"
+    },
+    "away": {
+      "id": "27",
+      "name": "Washington Wizards",
+      "score": null,
+      "record": "4-7"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NBA:401909967": {
+    "id": "NBA:401909967",
+    "sport": "NBA",
+    "event": "Cleveland Cavaliers at New York Knicks",
+    "start": "2026-11-12T00:00Z",
+    "home": {
+      "id": "18",
+      "name": "New York Knicks",
+      "score": null,
+      "record": "6-4"
+    },
+    "away": {
+      "id": "5",
+      "name": "Cleveland Cavaliers",
+      "score": null,
+      "record": "5-6"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NBA:401909968": {
+    "id": "NBA:401909968",
+    "sport": "NBA",
+    "event": "Boston Celtics at Toronto Raptors",
+    "start": "2026-11-12T00:00Z",
+    "home": {
+      "id": "28",
+      "name": "Toronto Raptors",
+      "score": null,
+      "record": "5-5"
+    },
+    "away": {
+      "id": "2",
+      "name": "Boston Celtics",
+      "score": null,
+      "record": "8-2"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NBA:401909969": {
+    "id": "NBA:401909969",
+    "sport": "NBA",
+    "event": "San Antonio Spurs at Chicago Bulls",
+    "start": "2026-11-12T01:00Z",
+    "home": {
+      "id": "4",
+      "name": "Chicago Bulls",
+      "score": null,
+      "record": "1-8"
+    },
+    "away": {
+      "id": "24",
+      "name": "San Antonio Spurs",
+      "score": null,
+      "record": "9-2"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NBA:401909970": {
+    "id": "NBA:401909970",
+    "sport": "NBA",
+    "event": "Denver Nuggets at Memphis Grizzlies",
+    "start": "2026-11-12T01:00Z",
+    "home": {
+      "id": "29",
+      "name": "Memphis Grizzlies",
+      "score": null,
+      "record": "7-3"
+    },
+    "away": {
+      "id": "7",
+      "name": "Denver Nuggets",
+      "score": null,
+      "record": "5-4"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NBA:401909971": {
+    "id": "NBA:401909971",
+    "sport": "NBA",
+    "event": "Los Angeles Lakers at Milwaukee Bucks",
+    "start": "2026-11-12T01:00Z",
+    "home": {
+      "id": "15",
+      "name": "Milwaukee Bucks",
+      "score": null,
+      "record": "1-10"
+    },
+    "away": {
+      "id": "13",
+      "name": "Los Angeles Lakers",
+      "score": null,
+      "record": "10-2"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NBA:401909972": {
+    "id": "NBA:401909972",
+    "sport": "NBA",
+    "event": "Brooklyn Nets at New Orleans Pelicans",
+    "start": "2026-11-12T01:00Z",
+    "home": {
+      "id": "3",
+      "name": "New Orleans Pelicans",
+      "score": null,
+      "record": "4-7"
+    },
+    "away": {
+      "id": "17",
+      "name": "Brooklyn Nets",
+      "score": null,
+      "record": "2-8"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NBA:401909973": {
+    "id": "NBA:401909973",
+    "sport": "NBA",
+    "event": "Orlando Magic at Utah Jazz",
+    "start": "2026-11-12T02:00Z",
+    "home": {
+      "id": "26",
+      "name": "Utah Jazz",
+      "score": null,
+      "record": "1-9"
+    },
+    "away": {
+      "id": "19",
+      "name": "Orlando Magic",
+      "score": null,
+      "record": "2-7"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NBA:401909974": {
+    "id": "NBA:401909974",
+    "sport": "NBA",
+    "event": "Golden State Warriors at Houston Rockets",
+    "start": "2026-11-12T02:30Z",
+    "home": {
+      "id": "10",
+      "name": "Houston Rockets",
+      "score": null,
+      "record": "8-3"
+    },
+    "away": {
+      "id": "9",
+      "name": "Golden State Warriors",
+      "score": null,
+      "record": "8-3"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NBA:401909975": {
+    "id": "NBA:401909975",
+    "sport": "NBA",
+    "event": "Oklahoma City Thunder at Portland Trail Blazers",
+    "start": "2026-11-12T03:00Z",
+    "home": {
+      "id": "22",
+      "name": "Portland Trail Blazers",
+      "score": null,
+      "record": "6-3"
+    },
+    "away": {
+      "id": "25",
+      "name": "Oklahoma City Thunder",
+      "score": null,
+      "record": "8-2"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NHL:401892690": {
+    "id": "NHL:401892690",
+    "sport": "NHL",
+    "event": "Tampa Bay Lightning at Buffalo Sabres",
+    "start": "2026-11-12T00:00Z",
+    "home": {
+      "id": "2",
+      "name": "Buffalo Sabres",
+      "score": null,
+      "record": "8-6-3"
+    },
+    "away": {
+      "id": "20",
+      "name": "Tampa Bay Lightning",
+      "score": null,
+      "record": "11-4-2"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NHL:401892691": {
+    "id": "NHL:401892691",
+    "sport": "NHL",
+    "event": "New York Rangers at Calgary Flames",
+    "start": "2026-11-12T00:30Z",
+    "home": {
+      "id": "3",
+      "name": "Calgary Flames",
+      "score": null,
+      "record": "8-9-1"
+    },
+    "away": {
+      "id": "13",
+      "name": "New York Rangers",
+      "score": null,
+      "record": "10-8-1"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NHL:401892692": {
+    "id": "NHL:401892692",
+    "sport": "NHL",
+    "event": "Philadelphia Flyers at Edmonton Oilers",
+    "start": "2026-11-12T02:00Z",
+    "home": {
+      "id": "6",
+      "name": "Edmonton Oilers",
+      "score": null,
+      "record": "13-3-3"
+    },
+    "away": {
+      "id": "15",
+      "name": "Philadelphia Flyers",
+      "score": null,
+      "record": "5-10-5"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NHL:401892693": {
+    "id": "NHL:401892693",
+    "sport": "NHL",
+    "event": "Utah Mammoth at Vegas Golden Knights",
+    "start": "2026-11-12T02:30Z",
+    "home": {
+      "id": "37",
+      "name": "Vegas Golden Knights",
+      "score": null,
+      "record": "12-5-2"
+    },
+    "away": {
+      "id": "129764",
+      "name": "Utah Mammoth",
+      "score": null,
+      "record": "10-7-1"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NHL:401892694": {
+    "id": "NHL:401892694",
+    "sport": "NHL",
+    "event": "Nashville Predators at Anaheim Ducks",
+    "start": "2026-11-12T03:00Z",
+    "home": {
+      "id": "25",
+      "name": "Anaheim Ducks",
+      "score": null,
+      "record": "10-7-1"
+    },
+    "away": {
+      "id": "27",
+      "name": "Nashville Predators",
+      "score": null,
+      "record": "8-4-5"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NHL:401892695": {
+    "id": "NHL:401892695",
+    "sport": "NHL",
+    "event": "Pittsburgh Penguins at San Jose Sharks",
+    "start": "2026-11-12T03:00Z",
+    "home": {
+      "id": "18",
+      "name": "San Jose Sharks",
+      "score": null,
+      "record": "8-11-1"
+    },
+    "away": {
+      "id": "16",
+      "name": "Pittsburgh Penguins",
+      "score": null,
+      "record": "6-10-2"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NCAAF:401866461": {
+    "id": "NCAAF:401866461",
+    "sport": "NCAAF",
+    "event": "Buffalo Bulls at Ball State Cardinals",
+    "start": "2026-11-12T00:30Z",
+    "home": {
+      "id": "2050",
+      "name": "Ball State Cardinals",
+      "score": null,
+      "record": "3-6"
+    },
+    "away": {
+      "id": "2084",
+      "name": "Buffalo Bulls",
+      "score": null,
+      "record": "6-3"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NCAAF:401866462": {
+    "id": "NCAAF:401866462",
+    "sport": "NCAAF",
+    "event": "Sacramento State Hornets at Central Michigan Chippewas",
+    "start": "2026-11-12T00:30Z",
+    "home": {
+      "id": "2117",
+      "name": "Central Michigan Chippewas",
+      "score": null,
+      "record": "4-5"
+    },
+    "away": {
+      "id": "16",
+      "name": "Sacramento State Hornets",
+      "score": null,
+      "record": "2-8"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NCAAF:401866463": {
+    "id": "NCAAF:401866463",
+    "sport": "NCAAF",
+    "event": "Massachusetts Minutemen at Toledo Rockets",
+    "start": "2026-11-12T00:30Z",
+    "home": {
+      "id": "2649",
+      "name": "Toledo Rockets",
+      "score": null,
+      "record": "7-2"
+    },
+    "away": {
+      "id": "113",
+      "name": "Massachusetts Minutemen",
+      "score": null,
+      "record": "5-4"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NCAAB:401920680": {
+    "id": "NCAAB:401920680",
+    "sport": "NCAAB",
+    "event": "Colgate Raiders at St. John's Red Storm",
+    "start": "2026-11-12T00:00Z",
+    "home": {
+      "id": "2599",
+      "name": "St. John's Red Storm",
+      "score": null,
+      "record": "2-0"
+    },
+    "away": {
+      "id": "2142",
+      "name": "Colgate Raiders",
+      "score": null,
+      "record": "0-2"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NCAAB:401909524": {
+    "id": "NCAAB:401909524",
+    "sport": "NCAAB",
+    "event": "Marquette Golden Eagles at Michigan Wolverines",
+    "start": "2026-11-12T00:00Z",
+    "home": {
+      "id": "130",
+      "name": "Michigan Wolverines",
+      "score": null,
+      "record": "1-1"
+    },
+    "away": {
+      "id": "269",
+      "name": "Marquette Golden Eagles",
+      "score": null,
+      "record": "2-0"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NCAAB:401925702": {
+    "id": "NCAAB:401925702",
+    "sport": "NCAAB",
+    "event": "Jacksonville State Gamecocks at Houston Cougars",
+    "start": "2026-11-12T01:00Z",
+    "home": {
+      "id": "248",
+      "name": "Houston Cougars",
+      "score": null,
+      "record": "2-0"
+    },
+    "away": {
+      "id": "55",
+      "name": "Jacksonville State Gamecocks",
+      "score": null,
+      "record": "1-1"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NCAAB:401928824": {
+    "id": "NCAAB:401928824",
+    "sport": "NCAAB",
+    "event": "Robert Morris Colonials at Arkansas Razorbacks",
+    "start": "2026-11-12T01:00Z",
+    "home": {
+      "id": "8",
+      "name": "Arkansas Razorbacks",
+      "score": null,
+      "record": "1-1"
+    },
+    "away": {
+      "id": "2523",
+      "name": "Robert Morris Colonials",
+      "score": null,
+      "record": "0-2"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NCAAB:401930177": {
+    "id": "NCAAB:401930177",
+    "sport": "NCAAB",
+    "event": "Arkansas-Pine Bluff Golden Lions at UCLA Bruins",
+    "start": "2026-11-12T02:00Z",
+    "home": {
+      "id": "26",
+      "name": "UCLA Bruins",
+      "score": null,
+      "record": "2-0"
+    },
+    "away": {
+      "id": "2029",
+      "name": "Arkansas-Pine Bluff Golden Lions",
+      "score": null,
+      "record": "0-2"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NCAAB:401926062": {
+    "id": "NCAAB:401926062",
+    "sport": "NCAAB",
+    "event": "Lindenwood Lions at Nebraska Cornhuskers",
+    "start": "2026-11-12T02:00Z",
+    "home": {
+      "id": "158",
+      "name": "Nebraska Cornhuskers",
+      "score": null,
+      "record": "2-0"
+    },
+    "away": {
+      "id": "2815",
+      "name": "Lindenwood Lions",
+      "score": null,
+      "record": "2-1"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  },
+  "NCAAB:401918054": {
+    "id": "NCAAB:401918054",
+    "sport": "NCAAB",
+    "event": "USC Trojans at California Golden Bears",
+    "start": "2026-11-12T04:00Z",
+    "home": {
+      "id": "25",
+      "name": "California Golden Bears",
+      "score": null,
+      "record": "2-1"
+    },
+    "away": {
+      "id": "30",
+      "name": "USC Trojans",
+      "score": null,
+      "record": "2-0"
+    },
+    "final": false,
+    "status": "Scheduled",
+    "day": "2026-11-11"
+  }
+}

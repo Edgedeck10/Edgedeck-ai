@@ -1,0 +1,30 @@
+[
+  {
+    "id": "NBA:401909965:portlandtrailblazers",
+    "event_id": "NBA:401909965",
+    "sport": "NBA",
+    "side": "home",
+    "selection": "Portland Trail Blazers",
+    "raw_probability": 0.53494,
+    "probability": 0.53494,
+    "odds": null,
+    "bookmaker": null,
+    "start": "2026-11-11T04:00Z",
+    "predicted_at": "2026-11-11T03:04:55.145150+00:00",
+    "outcome": null
+  },
+  {
+    "id": "NBA:401909965:oklahomacitythunder",
+    "event_id": "NBA:401909965",
+    "sport": "NBA",
+    "side": "away",
+    "selection": "Oklahoma City Thunder",
+    "raw_probability": 0.46506,
+    "probability": 0.46506,
+    "odds": null,
+    "bookmaker": null,
+    "start": "2026-11-11T04:00Z",
+    "predicted_at": "2026-11-11T03:04:55.145150+00:00",
+    "outcome": null
+  }
+]
