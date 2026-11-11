@@ -30,7 +30,7 @@ function renderSports(){
  document.querySelectorAll('[data-player]').forEach(b=>b.onclick=()=>{document.getElementById('search').value=b.dataset.player;document.getElementById('lineType').value='props';renderBoard();go('board')});
  document.getElementById('manualSport').value=activeSport;renderDaily();renderScheduleStrip();
 }
-function switchSport(s){activeSport=s;selected=[];resetFilters();renderSports();renderKpis();renderBoard();renderGames();renderCalibration();renderSlip();if(historyLoaded)renderHistory();if(dailyLoaded)renderDailyRecords();go('board')}
+function switchSport(s){activeSport=s;selected=[];resetFilters();renderSports();renderKpis();renderBoard();renderGames();renderCalibration();renderSlip();if(historyLoaded)renderHistory();if(dailyLoaded)renderDailyRecords();document.body.dataset.discover='all';document.querySelectorAll('[data-discover]').forEach(b=>b.classList.toggle('active',b.dataset.discover==='all'));go('board');document.getElementById('dailySpotlight').scrollIntoView({behavior:'smooth',block:'start'})}
 function formatLeg(r){return esc(r.selection)+' · '+esc(label(r))}
 function recordPill(size,sport=activeSport){const m=report.daily_summary?.[sport]?.[String(size)];return m?`${m.wins}W–${m.losses}L · ${pct(m.win_rate)}`:'0W–0L · —'}
 function ticketCard(t,size,hero=false){

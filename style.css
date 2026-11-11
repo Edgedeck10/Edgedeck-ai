@@ -39,5 +39,6 @@ body[data-view="allpicks"] .discover-nav{display:none}
 
 .model-audit{margin:14px 0;padding:12px;background:#eef5f0;border:1px solid #ceddd2;border-radius:10px;font-size:12px;color:#163b2b}.model-audit summary{font-weight:750;cursor:pointer}.model-audit input{display:block;width:100%;margin:8px 0;padding:10px;border:1px solid #acbdaf;border-radius:8px;background:#fff;color:#0c2340}.audit-result{padding:10px;background:white;border-radius:8px}.model-audit p{line-height:1.55}
 
-/* Remove decorative clover watermarks from all content surfaces. */
 body::before,.hero::after,.hero aside::after,.pick::before,.daily-hero::after{content:none!important;display:none!important}
+
+body[data-view]:not([data-view="board"]) .discover-nav,body[data-view]:not([data-view="board"]) #dailySpotlight,body[data-view]:not([data-view="board"]) #dailyParlays,body[data-view]:not([data-view="board"]) #perfectProps,body[data-view]:not([data-view="board"]) #dailyResearch,body[data-view]:not([data-view="board"]) #researchParlays{display:none}button,a,summary,input,select{touch-action:manipulation}.ticket-top{pointer-events:none}.ticket-tool-row{position:relative;z-index:1}.discover-nav{scroll-margin-top:10px}#dailySpotlight,#dailyParlays,#perfectProps{scroll-margin-top:66px}button:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid #14956a;outline-offset:3px}@media(max-width:700px){button,summary,select{min-height:44px}.mobile-nav{z-index:100}.shell{padding-bottom:40px}}

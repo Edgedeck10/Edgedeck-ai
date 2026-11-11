@@ -87,3 +87,11 @@ Best singles, research parlays and perfect-history options use the current India
 
 ## 4.9 · Minimum total +100
 All active recommended singles and parlays require total odds +100 or higher. Unquoted recommendations use the unrounded model probability (at most 50%) to enforce model fair decimal odds >=2; displayed rounding cannot admit a shorter-priced ticket. Observed ticket products also require decimal >=2; product estimates are not actual book parlay quotes. Individual parlay legs may retain negative fair prices. Estimated singles now screen 45–50% modeled outcomes, stable role and at least 45% descriptive historical clearing, ranking confidence within the permitted price band. Probabilities are never increased to imply high hit rates at even-money prices. Smaller or perfect-history combinations that fail the total-price rule are withheld. Existing tickets remain in the permanent record and continue grading.
+
+
+## 4.10 · Control and ranking fixes
+Switching sports resets Discover filters and scrolls to that sport’s best-pick area. Other views hide the home feed so navigation reaches the requested tool without stacked sticky controls. Add-to-builder opens the builder. Frozen-ticket legs can resolve refreshed IDs only when event/player/market/side/threshold match exactly; unavailable or changed thresholds remain blocked with feedback. No silent line substitutions. Mobile targets and keyboard focus are more accessible; decorative ribbons do not intercept taps.
+Unquoted board sorting now favors buffered probability, sample support and fewer flags instead of the illustrative-price research score. Illustrative baseline comparisons are labeled accordingly. This improves evidence handling, not a claim of measured prediction accuracy or access to Linemate’s data. Existing over-only, daily-slate, minimum +100 total and immutable record rules remain.
+
+
+Minimum recommendation total revised to -110 or better: decimal >=21/11. Model-fair recommendations require unrounded probability <=11/21; real offers remain separate. Individual legs can have shorter prices. Original +100-policy tickets remain in historical records.
