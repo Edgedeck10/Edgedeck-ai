@@ -437,7 +437,7 @@ def main():
  for r in best_targets:
   if r['sport'] in best_sports:continue
   r['rationale']=pick_evidence.build(r,events,injuries,PLAYER_LOGS,scores);best_rows.append(r);best_sports.add(r['sport'])
- estimated_current,estimated_summary=daily.update_research(estimated_ledger,best_rows,TODAY.isoformat(),NOW.isoformat(),events,box,settle,sizes=(1,),policy='estimated-best-confidence-v6',over_only=True,min_decimal=1)
+ estimated_current,estimated_summary=daily.update_research(estimated_ledger,best_rows,TODAY.isoformat(),NOW.isoformat(),events,box,settle,sizes=(1,),policy='estimated-best-conditional-v7',over_only=True,min_decimal=1)
  estimated_current=copy.deepcopy(estimated_current)
  for ticket in estimated_current:ticket['current_review']=news_feed.review(ticket,rows,events,injuries,news,NOW.isoformat())
  perfect_current,perfect_summary=daily.update_research(perfect_ledger,perfect_safe,TODAY.isoformat(),NOW.isoformat(),events,box,settle,sizes=(5,7,9),policy='perfect-history-confidence-v6',over_only=True,min_decimal=1)
