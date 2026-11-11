@@ -10,6 +10,7 @@ import daily_picks as daily
 import pick_evidence
 import opportunity_metrics
 import actuarial
+import history_window
 import news_feed
 import extra_fixtures
 import copy
@@ -255,6 +256,7 @@ def player_rows(events,e,box,injuries,history):
     g=events.get(x['event_id']);own_side='home' if g and g['home']['id']==x['team_id'] else 'away'
     pairs.append(({**x,'venue':own_side},v))
    if len(pairs)<5:continue
+   pairs,window_audit=history_window.select(pairs,market,e['sport'])
    audit=an.sample_audit(pairs)
    unit,_=an.opportunities(market,e['sport'],pairs[-1][0]['stats'])
    matchup=an.opponent_adjustment(MATCHUP_INDEX,e['sport'],opp['id'],pos,market,unit)
@@ -272,6 +274,7 @@ def player_rows(events,e,box,injuries,history):
     logs.append({'date':x['start'],'value':v,'opponent':other.get('abbr') or other.get('name','Unknown'),'opponent_id':other.get('id'),'venue':x['venue'],'minutes':x['stats'].get('Minutes'),'event_id':x['event_id']})
    PLAYER_LOGS[log_key]={'games':logs[-25:],'opponent_id':opp['id'],'opponent':opp['name'],'residuals':model['residuals'],'sample':len(vals)}
    opportunity=opportunity_metrics.framework(pairs,market,e['sport'],model)
+   opportunity['history_window']=window_audit
    for line in sorted(lines):
     for side in ('Over',):
      hits=[int(v>line) if side=='Over' else int(v<line) for v in vals];streak=0
