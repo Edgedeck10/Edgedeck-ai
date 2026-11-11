@@ -1046,7 +1046,7 @@
       "record": "2-7"
     },
     "final": false,
-    "status": "Halftime",
+    "status": "In Progress",
     "day": "2026-11-10"
   },
   "NBA:401909963": {
@@ -1067,7 +1067,7 @@
       "record": "4-6"
     },
     "final": false,
-    "status": "In Progress",
+    "status": "Halftime",
     "day": "2026-11-10"
   },
   "NBA:401909964": {
@@ -1088,7 +1088,7 @@
       "record": "2-7"
     },
     "final": false,
-    "status": "Scheduled",
+    "status": "In Progress",
     "day": "2026-11-10"
   },
   "NBA:401909965": {
@@ -1204,17 +1204,17 @@
     "home": {
       "id": "29",
       "name": "Columbus Blue Jackets",
-      "score": null,
-      "record": "7-8-0"
+      "score": 1,
+      "record": ""
     },
     "away": {
       "id": "26",
       "name": "Florida Panthers",
-      "score": null,
-      "record": "9-7-2"
+      "score": 4,
+      "record": ""
     },
-    "final": false,
-    "status": "In Progress",
+    "final": true,
+    "status": "Final",
     "day": "2026-11-10"
   },
   "NHL:401892687": {
@@ -1256,7 +1256,7 @@
       "record": "8-4-5"
     },
     "final": false,
-    "status": "Scheduled",
+    "status": "In Progress",
     "day": "2026-11-10"
   },
   "NCAAF:401866458": {
@@ -1319,7 +1319,7 @@
       "record": "7-2"
     },
     "final": false,
-    "status": "Halftime",
+    "status": "In Progress",
     "day": "2026-11-10"
   },
   "NCAAB:401913527": {
@@ -1330,17 +1330,17 @@
     "home": {
       "id": "2641",
       "name": "Texas Tech Red Raiders",
-      "score": null,
-      "record": "2-0"
+      "score": 84,
+      "record": "3-0"
     },
     "away": {
       "id": "356",
       "name": "Illinois Fighting Illini",
-      "score": null,
-      "record": "2-0"
+      "score": 78,
+      "record": "2-1"
     },
-    "final": false,
-    "status": "In Progress",
+    "final": true,
+    "status": "Final",
     "day": "2026-11-10"
   },
   "NCAAB:401920425": {
@@ -1361,7 +1361,7 @@
       "record": "0-2"
     },
     "final": false,
-    "status": "Halftime",
+    "status": "In Progress",
     "day": "2026-11-10"
   },
   "NCAAB:401909740": {
