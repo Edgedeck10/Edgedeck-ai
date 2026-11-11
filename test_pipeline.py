@@ -37,7 +37,7 @@ if __name__=='__main__':unittest.main()
 class AnalyticsTest(unittest.TestCase):
  def test_odds_value_is_not_high_hit_rate(self):
   import analytics as a
-  self.assertEqual(a.value_metrics(.90,-1500)['value_status'],'Pass at this price')
+  self.assertEqual(a.value_metrics(.90,-1500)['value_status'],'Outside price range')
   self.assertEqual(a.value_metrics(.68,-150,.03)['value_status'],'Provisional value')
   self.assertAlmostEqual(a.value_metrics(.68,-150,.03)['edge_pp'],8)
  def test_price_band_and_risk_buffer(self):

@@ -27,9 +27,10 @@ jobs:
           python-version: '3.12'
       - name: Verify model and settlement logic
         run: |
-          python -m unittest test_pipeline.py
+          python -m unittest discover -p 'test_*.py'
           node --check app.js
           node --check analysis-ui.js
+          node --check sports-ui.js
           node test_ui.cjs
       - name: Collect scores, grade history, calibrate predictions
         run: python pipeline.py
@@ -48,8 +49,9 @@ jobs:
       - name: Prepare public dashboard
         run: |
           mkdir -p _site/data
-          cp index.html style.css app.js analysis-ui.js manifest.webmanifest icon.svg _site/
-          cp data/latest.json data/history.json data/shortlist_history.json _site/data/
+          cp index.html style.css app.js analysis-ui.js sports-ui.js manifest.webmanifest icon.svg _site/
+          cp data/latest.json data/history.json data/shortlist_history.json data/daily_history.json data/history_manifest.json _site/data/
+          cp -r data/history_archive _site/data/
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:

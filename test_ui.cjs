@@ -2,7 +2,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const context={Date,Math,Number,String,Map,implied:o=>o<0?-o/(-o+100):100/(o+100),decimal:o=>o<0?1+100/-o:1+o/100,esc:s=>String(s??'').replaceAll('<','&lt;'),fmt:n=>String(n??'—'),date:s=>s,report:{player_logs:{test:{games:[{date:'2026-11-01',value:12,opponent:'BOS',opponent_id:'x',venue:'home'},{date:'2026-11-02',value:7,opponent:'NY',opponent_id:'y',venue:'away'}],opponent_id:'x'}}}};
 vm.createContext(context);vm.runInContext(fs.readFileSync(__dirname+'/analysis-ui.js','utf8'),context);
 const now=new Date().toISOString();
-assert.equal(context.valueAssess({probability:.9,probability_margin:.04,sample:20,odds:-1500,observed_at:now}).value_status,'Pass at this price');
+assert.equal(context.valueAssess({probability:.9,probability_margin:.04,sample:20,odds:-1500,observed_at:now}).value_status,'Outside price range');
 assert.equal(context.valueAssess({probability:.68,probability_margin:.03,sample:20,odds:-150,observed_at:now}).value_status,'Provisional value');
 assert.equal(context.valueAssess({probability:.98,probability_margin:.02,odds:-3900,observed_at:now}).value_status,'Outside price range');
 assert.equal(context.valueAssess({probability:.68,odds:null}).edge_pp,null);

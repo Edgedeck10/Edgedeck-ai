@@ -103,7 +103,7 @@ def tail_probability(line,side,mu,sd,residuals):
 def american(decimal):return round((decimal-1)*100) if decimal>=2 else round(-100/(decimal-1))
 def break_even(o):return abs(o)/(abs(o)+100) if o<0 else 100/(o+100)
 def decimal(o):return 1+100/abs(o) if o<0 else 1+o/100
-def price_in_band(o):return o is not None and (o==100 or -1500<=o<=-100)
+def price_in_band(o):return o is not None and (100<=o<=200 or -200<=o<=-100)
 def value_metrics(p,odds,margin=.04):
  conservative=max(.01,p-margin);minimum_decimal=max(1.05/max(p,.01),1/max(.01,p-.03),1/conservative)
  result={'probability_floor':round(conservative,5),'probability_margin':round(margin,5),'entry_price_limit':american(minimum_decimal),'scenario_prices':PRICE_LADDER}
@@ -116,3 +116,17 @@ def research_score(p,margin,odds,sample):
   m=value_metrics(p,odds,margin);return (m['conservative_roi_pct'] or 0)+.25*(m['edge_pp'] or 0)
  # Unpriced targets near a plausible -150 price are research priorities, never verified edges.
  return 10-abs(p-.68)*30+min(sample,25)*.1-margin*30
+
+
+def season_key(sport,start):
+ year=int(start[:4]);month=int(start[5:7])
+ if sport in ('NBA','NCAAB','NHL'):return year+1 if month>=7 else year
+ if sport in ('NFL','NCAAF'):return year if month>=7 else year-1
+ return year
+
+def sample_audit(pairs):
+ vals=[v for _,v in pairs];n=len(vals);median=st.median(vals);mad=st.median(abs(v-median) for v in vals);outliers=sum(abs(v-median)>max(4*mad,3*math.sqrt(max(median,1)),5) for v in vals)
+ exposures=[r['stats'].get('Minutes') for r,v in pairs if (r['stats'].get('Minutes') or 0)>0];role=False
+ if len(exposures)>=10:
+  prior=avg(exposures[:-5]);role=prior>0 and abs(avg(exposures[-5:])/prior-1)>.2
+ return {'sample_games':n,'from':pairs[0][0]['start'],'to':pairs[-1][0]['start'],'outlier_games':outliers,'role_changed':role,'method':'Current season; current-team window when at least five games exist. Outliers remain visible, not silently removed.','flags':(['Role changed'] if role else [])+(['Outlier-sensitive'] if outliers else [])}
