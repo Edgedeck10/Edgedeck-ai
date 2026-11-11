@@ -16,5 +16,3 @@ Predictions are archived before start, graded after finals, and retained in data
 ## Local use
 Python 3.10+ with standard library: python pipeline.py. Serve this directory over HTTP to load dashboard JSON. No dependency installation required.
 
-## Current deployment status
-Prepared and locally checked. Repository writes returned HTTP 403 Resource not accessible by integration. No source files were uploaded and no published deployment was verified.
