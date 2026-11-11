@@ -1015,17 +1015,17 @@
     "home": {
       "id": "20",
       "name": "Philadelphia 76ers",
-      "score": null,
+      "score": 101,
       "record": "9-2"
     },
     "away": {
       "id": "2",
       "name": "Boston Celtics",
-      "score": null,
+      "score": 123,
       "record": "8-2"
     },
-    "final": false,
-    "status": "In Progress",
+    "final": true,
+    "status": "Final",
     "day": "2026-11-10"
   },
   "NBA:401909962": {
