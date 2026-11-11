@@ -10,7 +10,7 @@ def build(r,events,injuries,player_logs,forecasts):
  if r.get('player_id'):
   games=(player_logs.get(r.get('log_key'),{}).get('games') or [])[-25:]
   d=ctx.get('opponent_position') or {}
-  notes.append(f"Production model: {r.get('rate')} per {r.get('exposure_unit','opportunity')} × {r.get('expected_exposure')} projected opportunities; projected {r.get('projection')} {market}.")
+  notes.append(f"Production model: {round(r.get('rate') or 0,3)} per {r.get('exposure_unit','opportunity')} × {round(r.get('expected_exposure') or 0,1)} projected opportunities; projected {r.get('projection')} {market}.")
   notes.append(f"Opponent position multiplier {d.get('multiplier',1)} using {d.get('games',0)} observed opponent games; position buckets, not individual defender tracking.")
   if r.get('hit_rate') is not None:notes.append(f"Observed full sample: {r['hit_rate']:.1%} cleared this threshold across {r.get('sample',0)} games; this is not next-game probability.")
   risks+=r.get('flags',[])
