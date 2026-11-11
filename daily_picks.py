@@ -32,7 +32,7 @@ def eligible(r,day,now,parlay=False):
 def estimated_singles(rows,now):
  # Rank confidence at model-fair prices near even money; no book offer or verified value inferred.
  bad=('questionable','doubtful','out','minutes volatility','role changed','outlier-sensitive','starter unconfirmed','opportunity data missing','day-to-day','teammate usage unresolved')
- pool=[r for r in rows if r.get('player_id') and r.get('odds') is None and in_window(r,now) and r.get('sample',0)>=(8 if r.get('sport') in ('NFL','NCAAF') else 10) and .55<=r.get('probability',0)<=2/3 and (r.get('hit_rate') or 0)>=.5 and not any(f.lower() in bad for f in r.get('flags',[]))]
+ pool=[r for r in rows if r.get('player_id') and r.get('odds') is None and r.get('side')=='Over' and in_window(r,now) and r.get('sample',0)>=(8 if r.get('sport') in ('NFL','NCAAF') else 10) and .55<=r.get('probability',0)<=2/3 and (r.get('hit_rate') or 0)>=.5 and not any(f.lower() in bad for f in r.get('flags',[]))]
  return sorted(pool,key=lambda r:(min(r.get('probability_floor',0),r.get('hit_rate',0)),r.get('sample',0)),reverse=True)
 
 def freeze_leg(r):
@@ -88,12 +88,12 @@ def update(records,rows,day,now,events,box,settle):
    summaries[sport][str(size)]={'tracked':len(ts),'wins':won,'losses':lost,'pushes':push,'pending':sum(r.get('result') is None for r in ts),'win_rate':won/settled if settled else None,'ci95':wilson(won,settled),'profit_units':round(sum(r.get('profit_units') or 0 for r in ts),4),'roi_pct':round(100*sum(r.get('profit_units') or 0 for r in ts)/settled,2) if settled else None,'sample_status':'Too early to judge' if settled<30 else 'Sample accumulating; inspect uncertainty','goal':[.85,.90] if size==1 else [.65,.80]}
  return current,summaries,availability
 
-def update_research(records,rows,day,now,events,box,settle,sizes=range(2,11),policy='research-week-v1'):
+def update_research(records,rows,day,now,events,box,settle,sizes=range(2,11),policy='research-week-v1',over_only=False):
  # Use the same outcome rules, but never invent prices, payouts or ROI for unquoted thresholds.
  update(records,[],day,now,events,box,settle)
- seen={(t['day'],t['sport'],t['leg_count']) for t in records};summary={}
+ seen={(t['day'],t['sport'],t['leg_count']) for t in records if t.get('policy_version')==policy};summary={}
  for sport in SPORTS:
-  pool=[r for r in rows if r['sport']==sport];games=set();players=set();diverse=[]
+  pool=[r for r in rows if r['sport']==sport and (not over_only or r.get('side')=='Over')];games=set();players=set();diverse=[]
   for r in pool:
    if r['event_id'] in games or r['player_id'] in players:continue
    diverse.append(r);games.add(r['event_id']);players.add(r['player_id'])
@@ -106,4 +106,4 @@ def update_research(records,rows,day,now,events,box,settle,sizes=range(2,11),pol
   for n in sizes:
    ts=[t for t in records if t['sport']==sport and t['leg_count']==n];w=sum(t.get('result')=='win' for t in ts);l=sum(t.get('result')=='loss' for t in ts)
    summary[sport][str(n)]={'wins':w,'losses':l,'pending':sum(t.get('result') is None for t in ts),'pushes':sum(t.get('result')=='push' for t in ts),'win_rate':w/(w+l) if w+l else None}
- return [t for t in records if t['day']==day],summary
+ return [t for t in records if t['day']==day and t.get('policy_version')==policy],summary

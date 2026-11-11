@@ -200,6 +200,7 @@ def team_rows(events,e,history):
   draw=sum(math.exp(-h-a)*(h*a)**k/(math.factorial(k)**2) for k in range(16))
   rows.append(make_row(e,'Moneyline','draw',None,m,sd,history,selection='Draw',sample=sample,raw_override=draw,flags=['Unvalidated Poisson model']))
  for side in ('Over','Under'):
+  if side=='Under' and not prices.get(('Total','under')):continue
   q=prices.get(('Total',side.lower()));line=q['line'] if q and q['line'] is not None else math.floor(h+a)+.5
   rows.append(make_row(e,'Total',side,line,h+a,sd,history,selection=e['event'],sample=sample,context={'home':hf,'away':af},flags=['Small sample'] if sample<10 else [],**({k:v for k,v in q.items() if k!='line'} if q else {})))
  # Period markets from real period scores; never divide full-game forecasts by 2/4 and call them measured.
@@ -212,7 +213,7 @@ def team_rows(events,e,history):
     if all(x is not None for x in v):values.append(sum(v))
   if len(values)>=5:
    mu=mean(values);sig=max(st.pstdev(values),3)
-   for side in ('Over','Under'):rows.append(make_row(e,period,side,math.floor(mu)+.5,mu,sig,history,selection=e['event'],sample=len(values),flags=['Unvalidated period model']))
+   for side in ('Over',):rows.append(make_row(e,period,side,math.floor(mu)+.5,mu,sig,history,selection=e['event'],sample=len(values),flags=['Unvalidated period model']))
  return rows
 
 BASKET={'Points':(5,1),'Rebounds':(2,1),'Assists':(2,1),'PRA':(5,1),'Points + rebounds':(5,1),'Points + assists':(5,1),'Rebounds + assists':(2,1),'Threes':(1,1),'Steals':(1,1),'Blocks':(1,1)}
@@ -269,7 +270,7 @@ def player_rows(events,e,box,injuries,history):
     logs.append({'date':x['start'],'value':v,'opponent':other.get('abbr') or other.get('name','Unknown'),'opponent_id':other.get('id'),'venue':x['venue'],'minutes':x['stats'].get('Minutes'),'event_id':x['event_id']})
    PLAYER_LOGS[log_key]={'games':logs[-25:],'opponent_id':opp['id'],'opponent':opp['name'],'residuals':model['residuals'],'sample':len(vals)}
    for line in sorted(lines):
-    for side in ('Over','Under'):
+    for side in ('Over',):
      hits=[int(v>line) if side=='Over' else int(v<line) for v in vals];streak=0
      for hit in reversed(hits):
       if not hit:break
@@ -417,14 +418,14 @@ def main():
   if daily.eligible(r,TODAY.isoformat(),NOW.isoformat()) or daily.eligible(r,TODAY.isoformat(),NOW.isoformat(),True):r['rationale']=pick_evidence.build(r,events,injuries,PLAYER_LOGS,scores)
  research=[]
  for sport in daily.SPORTS:
-  candidates=[r for r in rows if r['sport']==sport and daily.in_window(r,NOW.isoformat()) and r.get('player_id') and r.get('odds') is None and r.get('sample',0)>=(8 if sport in ('NFL','NCAAF') else 10) and .8<=r['probability']<=.9 and (r.get('hit_rate') or 0)>=.8 and not any(any(term in f.lower() for term in ('questionable','doubtful','day-to-day','outlier','role changed','minutes volatility','unresolved','starter unconfirmed','opportunity data missing')) for f in r.get('flags',[]))]
+  candidates=[r for r in rows if r['sport']==sport and daily.in_window(r,NOW.isoformat()) and r.get('player_id') and r.get('side')=='Over' and r.get('odds') is None and r.get('sample',0)>=(8 if sport in ('NFL','NCAAF') else 10) and .8<=r['probability']<=.9 and (r.get('hit_rate') or 0)>=.8 and not any(any(term in f.lower() for term in ('questionable','doubtful','day-to-day','outlier','role changed','minutes volatility','unresolved','starter unconfirmed','opportunity data missing')) for f in r.get('flags',[]))]
   used_games=set();used_players=set()
   for r in sorted(candidates,key=lambda r:(min(r['probability_floor'],r['hit_rate']),r.get('sample',0)),reverse=True):
    if r['event_id'] in used_games or r['player_id'] in used_players:continue
    watch={k:v for k,v in r.items() if k not in ('context','reasoning','recent_values')};watch['rationale']=pick_evidence.build(r,events,injuries,PLAYER_LOGS,scores);research.append(watch);used_games.add(r['event_id']);used_players.add(r['player_id'])
    if len(used_games)>=10:break
  # All finite-sample perfect thresholds; never remove losses to improve history.
- perfect=[r for r in rows if r.get('player_id') and daily.in_window(r,NOW.isoformat()) and r.get('sample',0)>=10 and r.get('hit_rate')==1 and str(r.get('injury_status','')).lower() not in ('out','doubtful')]
+ perfect=[r for r in rows if r.get('player_id') and r.get('side')=='Over' and daily.in_window(r,NOW.isoformat()) and r.get('sample',0)>=10 and r.get('hit_rate')==1 and str(r.get('injury_status','')).lower() not in ('out','doubtful')]
  perfect.sort(key=lambda r:(r.get('probability_floor',0),r.get('sample',0)),reverse=True)
  perfect_safe=[r for r in perfect if not any(any(term in flag.lower() for term in ('questionable','doubtful','outlier','role changed','minutes volatility','unresolved','starter unconfirmed','opportunity data missing','day-to-day')) for flag in r.get('flags',[]))]
  best_targets=daily.estimated_singles(rows,NOW.isoformat())
@@ -433,12 +434,12 @@ def main():
  for r in best_targets:
   if r['sport'] in best_sports:continue
   r['rationale']=pick_evidence.build(r,events,injuries,PLAYER_LOGS,scores);best_rows.append(r);best_sports.add(r['sport'])
- estimated_current,estimated_summary=daily.update_research(estimated_ledger,best_rows,TODAY.isoformat(),NOW.isoformat(),events,box,settle,sizes=(1,),policy='estimated-best-v1')
+ estimated_current,estimated_summary=daily.update_research(estimated_ledger,best_rows,TODAY.isoformat(),NOW.isoformat(),events,box,settle,sizes=(1,),policy='estimated-best-overs-v2',over_only=True)
  estimated_current=copy.deepcopy(estimated_current)
  for ticket in estimated_current:ticket['current_review']=news_feed.review(ticket,rows,events,injuries,news,NOW.isoformat())
- perfect_current,perfect_summary=daily.update_research(perfect_ledger,perfect_safe,TODAY.isoformat(),NOW.isoformat(),events,box,settle,sizes=(5,7,9),policy='perfect-history-v1')
+ perfect_current,perfect_summary=daily.update_research(perfect_ledger,perfect_safe,TODAY.isoformat(),NOW.isoformat(),events,box,settle,sizes=(5,7,9),policy='perfect-history-overs-v2',over_only=True)
  daily_current,daily_summary,daily_availability=daily.update(daily_ledger,rows,TODAY.isoformat(),NOW.isoformat(),events,box,settle)
- research_current,research_summary=daily.update_research(research_ledger,research,TODAY.isoformat(),NOW.isoformat(),events,box,settle)
+ research_current,research_summary=daily.update_research(research_ledger,research,TODAY.isoformat(),NOW.isoformat(),events,box,settle,policy='research-overs-v2',over_only=True)
  research_current=copy.deepcopy(research_current)
  for ticket in research_current:ticket['current_review']=news_feed.review(ticket,rows,events,injuries,news,NOW.isoformat())
  perfect_current=copy.deepcopy(perfect_current)
@@ -484,7 +485,7 @@ def main():
   sport=key.split(':')[0]
   for pid,url in roster_data.get('images',{}).items():
    if url:profiles[sport+':'+pid]={'headshot':url}
- report={'estimated_best':estimated_current,'estimated_best_summary':estimated_summary,'perfect_tickets':perfect_current,'perfect_summary':perfect_summary,'perfect_prop_ids':[r['id'] for r in perfect],'extra_fixtures':extra_events,'research_tickets':research_current,'research_summary':research_summary,'news':news,'selection_window_days':7,'daily_research':research,'daily_policy':daily.POLICY,'sport_calibration_bins':sport_bins,'daily_picks':daily_current,'daily_summary':daily_summary,'daily_availability':daily_availability,'sport_metrics':sport_metrics,'player_profiles':profiles,'player_logs':PLAYER_LOGS,'ranking_policy':{'odds_min':-200,'odds_max':200,'min_edge_pp':3,'min_roi_pct':5,'description':'Actual quoted prices first; require positive buffered edge. Unpriced lines are price-check research targets, never verified bets.'},'featured_ids':featured,'portfolio_metrics':{'tracked':len(shortlist),'settled':len(featured_settled),'won':sum(r['outcome'] for r in featured_settled),'hit_ratio':mean([r['outcome'] for r in featured_settled],None),'brier':mean([(r['probability']-r['outcome'])**2 for r in featured_settled],None)},'version':MODEL,'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'refresh_minutes':15,'recommendations':rows,'games':future,'injuries':injuries,'metrics':{'tracked_predictions':len(history),'settled_predictions':len(settled),'won':sum(r['outcome'] for r in settled),'brier_score':round(brier,4) if brier is not None else None,'independent_groups':len(groups),'priced_settled':len(priced),'realized_roi_pct':round(100*sum(r['profit_units'] for r in priced)/len(priced),2) if priced else None},'calibration_bins':bins,'coverage':list(SPORTS),'source':'ESPN public scoreboards / boxscores / injury reports; DraftKings game odds where supplied by ESPN','errors':ERRORS,'backfill_remaining':max(0,len(needed)-len(target)),'limitations':['Player-prop prices are not provided by the free game feed. Suggested lines are model thresholds, not sportsbook offers.','Normal-distribution model estimates are provisional, especially for rare events. No 90% estimate is validated yet.','Position defense uses roster role buckets, not player tracking or confirmed individual matchups. Opportunity data gaps are neutral adjustments, not fabricated inputs.','No automatic odds feeds for golf, tennis or UFC; exact markets can be imported locally.','Missing player participation remains pending for review, never automatically graded as a loss.']}
+ report={'alternate_line_policy':'Overs only; original observed game-market quotes are separate. Earlier forecasts remain in the record.','estimated_best':estimated_current,'estimated_best_summary':estimated_summary,'perfect_tickets':perfect_current,'perfect_summary':perfect_summary,'perfect_prop_ids':[r['id'] for r in perfect],'extra_fixtures':extra_events,'research_tickets':research_current,'research_summary':research_summary,'news':news,'selection_window_days':7,'daily_research':research,'daily_policy':daily.POLICY,'sport_calibration_bins':sport_bins,'daily_picks':daily_current,'daily_summary':daily_summary,'daily_availability':daily_availability,'sport_metrics':sport_metrics,'player_profiles':profiles,'player_logs':PLAYER_LOGS,'ranking_policy':{'odds_min':-200,'odds_max':200,'min_edge_pp':3,'min_roi_pct':5,'description':'Actual quoted prices first; require positive buffered edge. Unpriced lines are price-check research targets, never verified bets.'},'featured_ids':featured,'portfolio_metrics':{'tracked':len(shortlist),'settled':len(featured_settled),'won':sum(r['outcome'] for r in featured_settled),'hit_ratio':mean([r['outcome'] for r in featured_settled],None),'brier':mean([(r['probability']-r['outcome'])**2 for r in featured_settled],None)},'version':MODEL,'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'refresh_minutes':15,'recommendations':rows,'games':future,'injuries':injuries,'metrics':{'tracked_predictions':len(history),'settled_predictions':len(settled),'won':sum(r['outcome'] for r in settled),'brier_score':round(brier,4) if brier is not None else None,'independent_groups':len(groups),'priced_settled':len(priced),'realized_roi_pct':round(100*sum(r['profit_units'] for r in priced)/len(priced),2) if priced else None},'calibration_bins':bins,'coverage':list(SPORTS),'source':'ESPN public scoreboards / boxscores / injury reports; DraftKings game odds where supplied by ESPN','errors':ERRORS,'backfill_remaining':max(0,len(needed)-len(target)),'limitations':['Player-prop prices are not provided by the free game feed. Suggested lines are model thresholds, not sportsbook offers.','Normal-distribution model estimates are provisional, especially for rare events. No 90% estimate is validated yet.','Position defense uses roster role buckets, not player tracking or confirmed individual matchups. Opportunity data gaps are neutral adjustments, not fabricated inputs.','No automatic odds feeds for golf, tennis or UFC; exact markets can be imported locally.','Missing player participation remains pending for review, never automatically graded as a loss.']}
  # No destructive retention of forecast history. Cache excludes bulky raw feed payloads.
  keep={'id','event_id','sport','selection','player_id','market','side','line','team_id','start','day','probability','raw_probability','odds','bookmaker','model_version','calibration_key','predicted_at','outcome','graded_at','profit_units','probability_floor','probability_margin','value_status','edge_pp','expected_roi_pct'}
  history=[{k:v for k,v in r.items() if k in keep} for r in history]
