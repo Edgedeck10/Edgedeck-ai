@@ -46,3 +46,5 @@ body[data-view]:not([data-view="board"]) .discover-nav,body[data-view]:not([data
 .view[hidden]{display:none!important}.view:not([hidden]){display:block!important}#aiparlays #dailyParlays,#trends #perfectProps{display:block!important}.view{scroll-margin-top:72px}body[data-view="aiparlays"] .discover-nav,body[data-view="trends"] .discover-nav{display:flex!important}
 
 .pick-context{margin:12px 0;border:1px solid #d2dfd6;border-radius:10px;padding:12px;color:#123b2d;background:#f4f8f5;font-size:12px}.pick-context summary{font-weight:750;cursor:pointer}.pick-context dt{font-weight:750;margin-top:12px}.pick-context dd{margin:4px 0;line-height:1.6}
+
+.payout-options{padding:12px;border:1px solid #d7bc6c;border-radius:10px;margin:12px 0;color:#123b2d;background:#fffdf3;font-size:12px}.payout-options summary{cursor:pointer;font-weight:750}.payout-options table{width:100%;border-collapse:collapse}.payout-options td,.payout-options th{padding:9px;text-align:left;border-bottom:1px solid #ddd}.cross-parlays{margin:24px 0}.cross-parlays>details>summary{color:#efcf7a;padding:15px;cursor:pointer}

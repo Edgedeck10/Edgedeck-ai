@@ -105,17 +105,18 @@ def update(records,rows,day,now,events,box,settle,min_decimal=1):
    summaries[sport][str(size)]={'tracked':len(ts),'wins':won,'losses':lost,'pushes':push,'pending':sum(r.get('result') is None for r in ts),'win_rate':won/settled if settled else None,'ci95':wilson(won,settled),'profit_units':round(sum(r.get('profit_units') or 0 for r in ts),4),'roi_pct':round(100*sum(r.get('profit_units') or 0 for r in ts)/settled,2) if settled else None,'sample_status':'Too early to judge' if settled<30 else 'Sample accumulating; inspect uncertainty','goal':[.85,.90] if size==1 else [.65,.80]}
  return current,summaries,availability
 
-def update_research(records,rows,day,now,events,box,settle,sizes=range(2,11),policy='research-week-v1',over_only=False,min_decimal=1):
+def update_research(records,rows,day,now,events,box,settle,sizes=range(2,11),policy='research-week-v1',over_only=False,min_decimal=1,sports=None):
  # Use the same outcome rules, but never invent prices, payouts or ROI for unquoted thresholds.
  update(records,[],day,now,events,box,settle)
  seen={(t['day'],t['sport'],t['leg_count']) for t in records if t.get('policy_version')==policy};summary={}
- for sport in SPORTS:
-  pool=[r for r in rows if r['sport']==sport and (not over_only or r.get('side')=='Over')];games=set();players=set();diverse=[]
+ for sport in (sports or SPORTS):
+  pool=[r for r in rows if (sport=='CROSS' or r['sport']==sport) and (not over_only or r.get('side')=='Over')];games=set();players=set();diverse=[]
   for r in pool:
    if r['event_id'] in games or r['player_id'] in players:continue
    diverse.append(r);games.add(r['event_id']);players.add(r['player_id'])
   for n in sizes:
    if len(diverse)<n:continue
+   if sport=='CROSS' and len({r['sport'] for r in diverse[:n]})<2:continue
    if (day,sport,n) in seen:continue
    legs=[{k:v for k,v in freeze_leg(r).items() if k!='rationale' or n==1} for r in diverse[:n]]
    if math.prod(r['probability'] for r in legs)>1/min_decimal:continue
