@@ -443,6 +443,6 @@ def main():
  # No destructive retention of forecast history. Cache excludes bulky raw feed payloads.
  keep={'id','event_id','sport','selection','player_id','market','side','line','team_id','start','day','probability','raw_probability','odds','bookmaker','model_version','calibration_key','predicted_at','outcome','graded_at','profit_units','probability_floor','probability_margin','value_status','edge_pp','expected_roi_pct'}
  history=[{k:v for k,v in r.items() if k in keep} for r in history]
- write('events.json',events);record_store.write_history(DATA,history);write('latest.json',record_store.normalize_report(report));write('cache.json',cache);write('shortlist_history.json',shortlist);write('daily_history.json',daily_ledger)
+ write('events.json',events);record_store.write_history(DATA,history);record_store.write_report(DATA,report);write('cache.json',cache);write('shortlist_history.json',shortlist);write('daily_history.json',daily_ledger)
  print(f'{len(future)} upcoming games | {len(rows)} lines | {sum(bool(r.get("player_id")) for r in rows)} player lines | {len(settled)} settled | {len(ERRORS)} feed errors')
 if __name__=='__main__':main()

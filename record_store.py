@@ -34,3 +34,13 @@ def normalize_report(report):
  report['model_details']=details;report['recommendations']=rows
  for e in report.get('games',[]):e.pop('odds',None);e.pop('roster_ids',None)
  return report
+
+
+def write_report(data,report):
+ payload=json.dumps(normalize_report(report),ensure_ascii=False,separators=(',',':'),allow_nan=False).encode()
+ zipped=gzip.compress(payload,mtime=0)
+ (data/'latest.json.gz').write_bytes(zipped)
+ # The compressed feed is authoritative; avoid GitHub's 100 MB per-file ceiling.
+ (data/'latest.json').unlink(missing_ok=True)
+ (data/'feed_status.json').write_text(json.dumps({'version':report['version'],'generated_at':report['generated_at'],'recommendations':len(report['recommendations']),'uncompressed_bytes':len(payload),'download_bytes':len(zipped),'daily_picks':len(report.get('daily_picks',[]))},separators=(',',':')))
+ return len(payload),len(zipped)

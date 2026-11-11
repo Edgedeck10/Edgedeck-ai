@@ -41,6 +41,7 @@ jobs:
           git add data/
           if ! git diff --cached --quiet; then
             git commit -m 'Refresh EdgeDeck data and outcome history'
+            git pull --rebase origin main
             git push
           fi
       - uses: actions/configure-pages@v5
@@ -50,7 +51,7 @@ jobs:
         run: |
           mkdir -p _site/data
           cp index.html style.css app.js analysis-ui.js sports-ui.js manifest.webmanifest icon.svg _site/
-          cp data/latest.json data/history.json data/shortlist_history.json data/daily_history.json data/history_manifest.json _site/data/
+          cp data/latest.json.gz data/feed_status.json data/history.json data/shortlist_history.json data/daily_history.json data/history_manifest.json _site/data/
           cp -r data/history_archive _site/data/
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3

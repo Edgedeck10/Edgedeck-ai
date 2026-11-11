@@ -36,6 +36,12 @@ class Daily(unittest.TestCase):
    p=Path(tmp);(p/'history.json').write_text(json.dumps(rs));self.assertEqual(store.read_history(p),rs);store.write_history(p,rs)
    self.assertEqual(store.read_history(p),rs);self.assertEqual(len(json.loads((p/'history.json').read_text())),5000)
    first=(p/'history_archive/2026-11.json.gz').read_bytes();store.write_history(p,rs);self.assertEqual(first,(p/'history_archive/2026-11.json.gz').read_bytes())
+ def test_compressed_feed(self):
+  with tempfile.TemporaryDirectory() as tmp:
+   p=Path(tmp);report={'version':'test','generated_at':NOW,'recommendations':[{'id':'a','probability':.6,'context':{'real':'data'}}],'games':[]}
+   (p/'latest.json').write_text('old');store.write_report(p,report)
+   self.assertFalse((p/'latest.json').exists());actual=json.loads(gzip.decompress((p/'latest.json.gz').read_bytes()))
+   self.assertEqual(actual['recommendations'][0]['probability'],.6);self.assertEqual(actual['model_details']['|||']['context'],{'real':'data'})
  def test_normalization_rehydrates_models(self):
   rows=[dict(log_key='test',context={'audit':'same'},sample=20,side=s,line=l,flags=[]) for s,l in [('Over',15.5),('Under',20.5)]]
   report={'recommendations':copy.deepcopy(rows),'games':[]};store.normalize_report(report)
