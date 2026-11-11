@@ -26,7 +26,7 @@ def write_history(data,rows):
  return manifest
 
 def normalize_report(report):
- fields={'context','reasoning','source_url','baseline','last5','trend_pct','projected_minutes','per_minute','rate','expected_exposure','exposure_unit','injury_status','position','team_id','model_version','calibration_key','sample','probability_margin','estimated_price_method','flags'}
+ fields={'event','event_id','sport','selection','player','player_id','start','day','market','projection','sd','log_key','context','reasoning','source_url','baseline','last5','trend_pct','projected_minutes','per_minute','rate','expected_exposure','exposure_unit','injury_status','position','team_id','model_version','sample','probability_margin','estimated_price_method','flags'}
  details={};rows=[]
  for r in report['recommendations']:
   key=r.get('log_key') or '|'.join(str(r.get(k,'')) for k in ('event_id','market','selection','side'))

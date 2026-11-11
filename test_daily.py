@@ -32,9 +32,9 @@ class Daily(unittest.TestCase):
  def test_no_filler_or_duplicate_game(self):
   ledger=[];d.update(ledger,[row(),row()|{'id':'duplicate'},row(1)|{'sport':'NFL'}],DAY,NOW,{}, {},lambda *x:None)
   self.assertEqual(len(ledger),2);self.assertTrue(all(t['leg_count']==1 for t in ledger))
- def test_low_probability_parlays_abstain(self):
+ def test_below_target_combinations_are_transparent(self):
   ledger=[];d.update(ledger,[row(i) for i in range(10)],DAY,NOW,{}, {},lambda *x:None)
-  self.assertEqual([t['leg_count'] for t in ledger],[1])
+  self.assertEqual([t['leg_count'] for t in ledger],list(range(1,11)));self.assertFalse(ledger[1]['target_met']);self.assertAlmostEqual(ledger[1]['probability'],.65**2)
  def test_confidence_beats_high_payout(self):
   ledger=[];d.update(ledger,[row(0)|{'probability':.45,'conservative_roi_pct':100},row(1)],DAY,NOW,{}, {},lambda *x:None)
   self.assertEqual(ledger[0]['legs'][0]['event_id'],'NBA:1')
@@ -42,6 +42,15 @@ class Daily(unittest.TestCase):
   old=[];d.update(old,[row()],DAY,NOW,{}, {},lambda *x:None);old[0]['policy_version']='old';prior=copy.deepcopy(old[0])
   current,_,_=d.update(old,[row(1)],DAY,NOW,{}, {},lambda *x:None)
   self.assertEqual(old[0],prior);self.assertEqual(len(old),2);self.assertEqual(len(current),1)
+ def test_week_ahead_and_cutoff(self):
+  self.assertTrue(d.eligible(row()|{'start':'2026-11-16T20:00:00Z','day':'2026-11-16'},DAY,NOW))
+  self.assertFalse(d.eligible(row()|{'start':'2026-11-19T20:00:00Z','day':'2026-11-19'},DAY,NOW))
+ def test_unpriced_research_records_no_roi(self):
+  ledger=[];rs=[row(i)|{'odds':None,'player_id':str(i),'probability':.85} for i in range(3)]
+  tickets,_=d.update_research(ledger,rs,DAY,NOW,{}, {},lambda *x:None);self.assertEqual(len(tickets),2)
+  old=copy.deepcopy(ledger);d.update_research(ledger,rs,DAY,NOW,{}, {},lambda *x:None);self.assertEqual(ledger,old)
+  _,s=d.update_research(ledger,[],DAY,NOW,{f'NBA:{i}':{'final':True} for i in range(3)}, {},lambda *x:1)
+  self.assertEqual(s['NBA']['2']['win_rate'],1);self.assertIsNone(ledger[0]['profit_units'])
  def test_archive_lossless(self):
   rs=[{'id':str(i),'start':'2026-11-11T00:00Z','probability':.6,'outcome':None} for i in range(5010)]
   with tempfile.TemporaryDirectory() as tmp:
