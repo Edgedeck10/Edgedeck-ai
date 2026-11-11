@@ -1,5 +1,6 @@
 """Measured selection evidence. Historical cover rates are descriptive, never a backtest."""
 import math,statistics as st
+from analytics import season_key
 
 def implied(o):return abs(o)/(abs(o)+100) if o<0 else 100/(o+100)
 def mean(xs):return st.mean(xs) if xs else None
@@ -13,6 +14,7 @@ def build(r,events,injuries,player_logs,forecasts):
   notes.append(f"Opponent position multiplier {d.get('multiplier',1)} using {d.get('games',0)} observed opponent games; position buckets, not individual defender tracking.")
   if r.get('hit_rate') is not None:notes.append(f"Observed full sample: {r['hit_rate']:.1%} cleared this threshold across {r.get('sample',0)} games; this is not next-game probability.")
   risks+=r.get('flags',[])
+  notes.append('Prior-season player threshold history is not available in this frozen sample. Current-season rates are not relabeled as career evidence; minutes-qualified streaks do not eliminate the chance of reduced minutes.')
  else:
   scores=forecasts.get(r['event_id'],{})
   if scores:notes.append(f"Projected score: {e.get('away',{}).get('name','Away')} {scores.get('away')} — {e.get('home',{}).get('name','Home')} {scores.get('home')}. Derived from scoring form, opponent allowance, home advantage and the stated rest adjustment.")
@@ -33,6 +35,12 @@ def build(r,events,injuries,player_logs,forecasts):
    threshold=-line if market=='Spread' else 0 if market=='Moneyline' else line
    hit='push' if v==threshold else int(v<threshold if side=='Under' else v>threshold)
    games.append({'date':g['start'],'opponent':opp,'value':v,'outcome':hit,'event_id':g['id']})
+  all_games=games[-100:];season=season_key(r['sport'],r['start'])
+  season_rates={}
+  for tag,key in [('current',season),('prior',season-1)]:
+   gs=[g for g in all_games if season_key(r['sport'],g['date'])==key];graded=[g for g in gs if g['outcome']!='push']
+   season_rates[tag]={'games':len(gs),'rate':sum(g['outcome']==1 for g in graded)/len(graded) if graded else None}
+  notes.append('Season comparison at the exact threshold: '+', '.join(tag+' '+(f"{x['rate']:.1%} of {x['games']} games" if x['rate'] is not None else 'not available in the collected archive') for tag,x in season_rates.items())+'. Seasons are shown separately; different rosters and opponents can change comparability.')
   games=games[-25:]
   risks.append('Basic team scoring model: schedule strength, confirmed rotations and validated injury impact are not fully modeled.')
  relevant=[i for i in injuries if i.get('event_id')==r['event_id']]
