@@ -83,3 +83,7 @@ References: https://www.rithmm.com/ai-sports-betting and https://www.rithmm.com/
 
 ## 4.8 · Daily slate policy
 Best singles, research parlays and perfect-history options use the current Indianapolis calendar day. If football has no games today, use the nearest scheduled football date; Sunday NFL selections open Saturday, never earlier. Other sports do not fill today’s selection areas with later-week games. Board/schedule research and immutable historical records remain available. New policy versions regenerate the current day’s eligible tickets without deleting earlier forecasts or losses.
+
+
+## 4.9 · Minimum total +100
+All active recommended singles and parlays require total odds +100 or higher. Unquoted recommendations use the unrounded model probability (at most 50%) to enforce model fair decimal odds >=2; displayed rounding cannot admit a shorter-priced ticket. Observed ticket products also require decimal >=2; product estimates are not actual book parlay quotes. Individual parlay legs may retain negative fair prices. Estimated singles now screen 45–50% modeled outcomes, stable role and at least 45% descriptive historical clearing, ranking confidence within the permitted price band. Probabilities are never increased to imply high hit rates at even-money prices. Smaller or perfect-history combinations that fail the total-price rule are withheld. Existing tickets remain in the permanent record and continue grading.

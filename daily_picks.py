@@ -47,14 +47,14 @@ def in_selection_day(r,days):
 def estimated_singles(rows,now):
  # Rank confidence at model-fair prices near even money; no book offer or verified value inferred.
  bad=('questionable','doubtful','out','minutes volatility','role changed','outlier-sensitive','starter unconfirmed','opportunity data missing','day-to-day','teammate usage unresolved')
- pool=[r for r in rows if r.get('player_id') and r.get('odds') is None and r.get('side')=='Over' and in_window(r,now) and r.get('sample',0)>=(8 if r.get('sport') in ('NFL','NCAAF') else 10) and .55<=r.get('probability',0)<=2/3 and (r.get('hit_rate') or 0)>=.5 and not any(f.lower() in bad for f in r.get('flags',[]))]
+ pool=[r for r in rows if r.get('player_id') and r.get('odds') is None and r.get('side')=='Over' and in_window(r,now) and r.get('sample',0)>=(8 if r.get('sport') in ('NFL','NCAAF') else 10) and .45<=r.get('probability',0)<=.5 and (r.get('hit_rate') or 0)>=.45 and not any(f.lower() in bad for f in r.get('flags',[]))]
  return sorted(pool,key=lambda r:(min(r.get('probability_floor',0),r.get('hit_rate',0)),r.get('sample',0)),reverse=True)
 
 def freeze_leg(r):
  keys=['id','event_id','sport','market','side','line','selection','event','player_id','team_id','start','day','probability','raw_probability','probability_floor','odds','bookmaker','odds_updated','observed_at','edge_pp','conservative_edge_pp','expected_roi_pct','model_version','sample','price_kind','source_url','rationale','projection','sd','probability_margin','entry_price_limit','calibration_games','hit_rate','hit_rate_low','hit_rate_high','log_key','flags','fanduel_verified','book_state','quote_source_url','fanduel_selection_url','fanduel_market_id','fanduel_selection_id','fair_odds','estimated_price','estimated_price_method','expected_exposure','exposure_unit','rate']
  return {k:r[k] for k in keys if k in r}|{'outcome':None}
 
-def update(records,rows,day,now,events,box,settle):
+def update(records,rows,day,now,events,box,settle,min_decimal=1):
  # Never overwrite selection, odds, forecast or original timestamp of an existing ticket.
  for ticket in records:
   if ticket.get('result') is not None:continue
@@ -90,6 +90,8 @@ def update(records,rows,day,now,events,box,settle):
    if len(diverse)<size:
     availability[sport]['sizes'][str(size)]=f'Only {len(diverse)} eligible independent games; need {size}. No filler selections.';continue
    legs=[freeze_leg(r) for r in diverse[:size]];p=math.prod(r['probability'] for r in legs);floor=math.prod(r.get('probability_floor',r['probability']-.05) for r in legs);d=math.prod(decimal(r['odds']) for r in legs)
+   if d<min_decimal:
+    availability[sport]['sizes'][str(size)]='Total quote must be +100 or greater.';continue
    availability[sport]['sizes'][str(size)]='Quoted positive-value combination; '+('meets' if p>=.65 else 'below')+' the 65% modeled joint target.'
    if key in seen:continue
    ticket={'id':f'{day}:{sport}:{size}:{POLICY}','policy_version':POLICY,'day':day,'sport':sport,'leg_count':size,'created_at':now,'legs':legs,'probability':round(p,6),'buffered_probability':round(floor,6),'candidate_count':len(diverse),'target_met':p>=.65 and (size==1 or all(r['probability']>=.8 for r in legs)),'scope':'Next seven days','joint_bounds':[max(0,sum(r['probability'] for r in legs)-(size-1)),min(r['probability'] for r in legs)],'probability_method':'Single forecast' if size==1 else 'Independent leg product; not correlation adjusted','display_odds':legs[0]['odds'] if size==1 else odds_from_decimal(d),'leg_product_decimal':round(d,5),'price_type':'Observed single quote' if size==1 else 'Quoted-leg product estimate, not a sportsbook parlay quote','result':None,'profit_units':None,'model_version':legs[0].get('model_version'),'selection_method':'Confidence first among positive-value observed quotes: highest risk-buffered probability, then buffered price edge, then sample size. One selection per event, no repeated player. Quoted parlay comparisons use 60%+ positive-value legs. A joint estimate below 65% is explicitly labeled below target; no success rate is implied.'}
@@ -103,7 +105,7 @@ def update(records,rows,day,now,events,box,settle):
    summaries[sport][str(size)]={'tracked':len(ts),'wins':won,'losses':lost,'pushes':push,'pending':sum(r.get('result') is None for r in ts),'win_rate':won/settled if settled else None,'ci95':wilson(won,settled),'profit_units':round(sum(r.get('profit_units') or 0 for r in ts),4),'roi_pct':round(100*sum(r.get('profit_units') or 0 for r in ts)/settled,2) if settled else None,'sample_status':'Too early to judge' if settled<30 else 'Sample accumulating; inspect uncertainty','goal':[.85,.90] if size==1 else [.65,.80]}
  return current,summaries,availability
 
-def update_research(records,rows,day,now,events,box,settle,sizes=range(2,11),policy='research-week-v1',over_only=False):
+def update_research(records,rows,day,now,events,box,settle,sizes=range(2,11),policy='research-week-v1',over_only=False,min_decimal=1):
  # Use the same outcome rules, but never invent prices, payouts or ROI for unquoted thresholds.
  update(records,[],day,now,events,box,settle)
  seen={(t['day'],t['sport'],t['leg_count']) for t in records if t.get('policy_version')==policy};summary={}
@@ -116,6 +118,7 @@ def update_research(records,rows,day,now,events,box,settle,sizes=range(2,11),pol
    if len(diverse)<n:continue
    if (day,sport,n) in seen:continue
    legs=[{k:v for k,v in freeze_leg(r).items() if k!='rationale' or n==1} for r in diverse[:n]]
+   if math.prod(r['probability'] for r in legs)>1/min_decimal:continue
    records.append({'id':f'{day}:{sport}:{n}:{policy}','policy_version':policy,'day':day,'sport':sport,'leg_count':n,'created_at':now,'legs':legs,'probability':math.prod(r['probability'] for r in legs),'buffered_probability':math.prod(r.get('probability_floor',r['probability']-.05) for r in legs),'result':None,'price_type':'Unquoted statistical thresholds; hypothetical outcome record only','profit_units':None})
   summary[sport]={}
   for n in sizes:

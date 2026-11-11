@@ -59,7 +59,7 @@ class Daily(unittest.TestCase):
   _,summary=d.update_research(ledger,[],DAY,NOW,{f'NBA:{i}':{'final':True} for i in range(12)}, {},lambda r,e,b:0 if r['player_id']=='8' else 1,sizes=(5,7,9),policy='perfect-history-v1')
   self.assertEqual(summary['NBA']['5']['win_rate'],1);self.assertEqual(summary['NBA']['9']['win_rate'],0);self.assertTrue(all(t['profit_units'] is None for t in ledger))
  def test_estimated_single_screen_and_frozen_evidence(self):
-  good=row()|{'odds':None,'side':'Over','player_id':'p','hit_rate':.7,'probability_floor':.60,'rationale':{'notes':['Original evidence']}}
+  good=row()|{'odds':None,'side':'Over','player_id':'p','hit_rate':.7,'probability':.49,'probability_floor':.44,'rationale':{'notes':['Original evidence']}}
   self.assertEqual(d.estimated_singles([good],NOW),[good])
   for change in [{'side':'Under'},{'probability':.85},{'hit_rate':.4},{'flags':['Role changed']},{'sample':9},{'odds':-110}]:
    self.assertEqual(d.estimated_singles([good|change],NOW),[])
@@ -79,6 +79,10 @@ class Daily(unittest.TestCase):
   rs=[row()|{'sport':'NBA'},row(1)|{'sport':'NBA','start':'2026-11-12T20:00:00Z'},row(2)|{'sport':'NFL','start':'2026-11-12T20:00:00Z'},row(3)|{'sport':'NFL','start':'2026-11-15T20:00:00Z'}]
   days=d.selection_days(rs,NOW);self.assertEqual(days['NBA'],DAY);self.assertEqual(days['NFL'],'2026-11-12');self.assertFalse(d.in_selection_day(rs[1],days))
   sunday=[rs[-1]];self.assertIsNone(d.selection_days(sunday,'2026-11-13T12:00:00Z')['NFL']);self.assertEqual(d.selection_days(sunday,'2026-11-14T12:00:00Z')['NFL'],'2026-11-15')
+ def test_plus100_research_total_gate(self):
+  rows=[row(i)|{'player_id':str(i),'side':'Over','odds':None,'probability':.8} for i in range(5)];ledger=[]
+  ts,_=d.update_research(ledger,rows,DAY,NOW,{}, {},lambda *x:None,sizes=(2,3,4,5),min_decimal=2,policy='plus100')
+  self.assertEqual([t['leg_count'] for t in ts],[4,5]);self.assertTrue(all(t['probability']<=.5 for t in ts))
  def test_archive_lossless(self):
   rs=[{'id':str(i),'start':'2026-11-11T00:00Z','probability':.6,'outcome':None} for i in range(5010)]
   with tempfile.TemporaryDirectory() as tmp:
