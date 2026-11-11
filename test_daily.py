@@ -3,13 +3,13 @@ from pathlib import Path
 import daily_picks as d,record_store as store,analytics as a,weather
 NOW='2026-11-11T12:00:00+00:00';DAY='2026-11-11'
 def row(i=0,**kw):
- return dict(id=str(i),event_id=f'NBA:{i}',sport='NBA',selection='Team '+str(i),market='Moneyline',side='Win',line=None,start='2026-11-11T20:00:00Z',day=DAY,probability=.65,odds=-110,bookmaker='Test quote',price_kind='Observed snapshot',odds_updated=NOW,observed_at=NOW,sample=20,edge_pp=12.62,conservative_edge_pp=6,expected_roi_pct=24,conservative_roi_pct=12,flags=[],**kw)
+ return dict(id=str(i),event_id=f'NBA:{i}',sport='NBA',selection='Team '+str(i),market='Moneyline',side='Win',line=None,start='2026-11-11T20:00:00Z',day=DAY,probability=.65,odds=-110,bookmaker='FanDuel',fanduel_verified=True,book_state='IN',quote_source_url='https://sportsbook.fanduel.com/',price_kind='Observed snapshot',odds_updated=NOW,observed_at=NOW,sample=20,edge_pp=12.62,conservative_edge_pp=6,expected_roi_pct=24,conservative_roi_pct=12,flags=[],**kw)
 def pool(n):
  return [row(i) for i in range(n)]+[row(i)|{'id':str(i)+'-alt','probability':.97,'probability_floor':.94,'odds':-500,'edge_pp':13.67,'conservative_edge_pp':10.67,'expected_roi_pct':16.4} for i in range(n)]
 class Daily(unittest.TestCase):
  def test_quote_gates(self):
   base=row();self.assertTrue(d.eligible(base,DAY,NOW))
-  for changes in [dict(price_kind='Suggested line'),dict(odds=-1500),dict(sample=9),dict(flags=['Role changed']),dict(odds_updated='2026-11-11T10:00:00Z'),dict(start='2026-11-11T12:05:00Z'),dict(edge_pp=20),dict(conservative_edge_pp=0)]:
+  for changes in [dict(fanduel_verified=False),dict(bookmaker='DraftKings'),dict(book_state='NJ'),dict(price_kind='Suggested line'),dict(odds=-1500),dict(sample=9),dict(flags=['Role changed']),dict(odds_updated='2026-11-11T10:00:00Z'),dict(start='2026-11-11T12:05:00Z'),dict(edge_pp=20),dict(conservative_edge_pp=0)]:
    self.assertFalse(d.eligible(base|changes,DAY,NOW),changes)
  def test_freeze_and_all_sizes(self):
   ledger=[];rows=pool(10);cur,_,_=d.update(ledger,rows,DAY,NOW,{}, {},lambda *x:None)
@@ -51,6 +51,13 @@ class Daily(unittest.TestCase):
   old=copy.deepcopy(ledger);d.update_research(ledger,rs,DAY,NOW,{}, {},lambda *x:None);self.assertEqual(ledger,old)
   _,s=d.update_research(ledger,[],DAY,NOW,{f'NBA:{i}':{'final':True} for i in range(3)}, {},lambda *x:1)
   self.assertEqual(s['NBA']['2']['win_rate'],1);self.assertIsNone(ledger[0]['profit_units'])
+ def test_perfect_sizes_rank_freeze_and_grade(self):
+  ledger=[];rs=[row(i)|{'odds':None,'player_id':str(i),'probability':.95,'hit_rate':1} for i in range(12)]
+  ts,_=d.update_research(ledger,rs,DAY,NOW,{}, {},lambda *x:None,sizes=(5,7,9),policy='perfect-history-v1')
+  self.assertEqual([t['leg_count'] for t in ts],[5,7,9]);self.assertTrue(all(len({r['event_id'] for r in t['legs']})==t['leg_count'] for t in ts))
+  old=copy.deepcopy(ledger);d.update_research(ledger,list(reversed(rs)),DAY,NOW,{}, {},lambda *x:None,sizes=(5,7,9),policy='perfect-history-v1');self.assertEqual(ledger,old)
+  _,summary=d.update_research(ledger,[],DAY,NOW,{f'NBA:{i}':{'final':True} for i in range(12)}, {},lambda r,e,b:0 if r['player_id']=='8' else 1,sizes=(5,7,9),policy='perfect-history-v1')
+  self.assertEqual(summary['NBA']['5']['win_rate'],1);self.assertEqual(summary['NBA']['9']['win_rate'],0);self.assertTrue(all(t['profit_units'] is None for t in ledger))
  def test_archive_lossless(self):
   rs=[{'id':str(i),'start':'2026-11-11T00:00Z','probability':.6,'outcome':None} for i in range(5010)]
   with tempfile.TemporaryDirectory() as tmp:
