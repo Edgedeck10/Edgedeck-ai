@@ -2,7 +2,7 @@
 No hypothetical weights, inputs or probability improvements are inferred from that chat.
 """
 import statistics as st
-from analytics import opportunities
+from analytics import opportunities, tail_probability
 
 SOURCE = 'https://chatgpt.com/share/6af4d7ac-2144-83ea-88a9-02d3434534d5'
 REQUIRED = {
@@ -27,3 +27,18 @@ def framework(pairs, market, sport, model):
   targets=sum(r['stats']['Targets'] for r,_ in valid); catches=sum(r['stats']['Receptions'] for r,_ in valid)
   out['receiving']={'games':len(valid),'catch_rate':catches/targets if targets else None,'yards_per_reception':sum(v for _,v in valid)/catches if catches else None,'note':'Historical decomposition only; forecast uses blended yards per target, so these full-sample components are not extra multipliers.'}
  return out
+
+
+def workload_sensitivity(pairs, market, sport, model, line, side):
+ """Empirical workload quantiles are stress tests, not fitted scenario probabilities.
+ Keep the existing forecast unchanged until walk-forward validation supports a replacement.
+ """
+ exposures=sorted(x for r,v in pairs if (x:=opportunities(market,sport,r['stats'])[1]) is not None and x>0)
+ expected=model.get('exposure')
+ if len(exposures)<5 or not expected or model.get('rate') is None:return []
+ result=[]
+ for label,q in [('Limited',.2),('Typical',.5),('Full',.8)]:
+  exposure=exposures[round((len(exposures)-1)*q)]
+  mu=model['mu']*exposure/expected
+  result.append({'scenario':label,'historical_workload_quantile':q,'opportunities':exposure,'projection':mu,'probability':tail_probability(line,side,mu,model['sd'],model['residuals'])})
+ return result

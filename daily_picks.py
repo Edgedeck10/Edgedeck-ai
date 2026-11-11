@@ -48,18 +48,7 @@ def estimated_singles(rows,now):
  # Rank confidence at model-fair prices near even money; no book offer or verified value inferred.
  bad=('questionable','doubtful','out','minutes volatility','role changed','outlier-sensitive','starter unconfirmed','opportunity data missing','day-to-day','teammate usage unresolved')
  pool=[r for r in rows if r.get('player_id') and r.get('odds') is None and r.get('side')=='Over' and in_window(r,now) and r.get('sample',0)>=(8 if r.get('sport') in ('NFL','NCAAF') else 10) and .60<=r.get('probability',0)<=.97 and (r.get('hit_rate') or 0)>=.45 and not any(f.lower() in bad for f in r.get('flags',[]))]
- # Keep strict picks first; expose a separately labeled research fallback only for a soft usage gap.
- strict_sports={r['sport'] for r in pool}
- for sport in SPORTS:
-  if sport in strict_sports:continue
-  for r in rows:
-   if r.get('sport')!=sport or not r.get('player_id') or r.get('odds') is not None or r.get('side')!='Over' or not in_window(r,now):continue
-   if r.get('sample',0)<(8 if sport in ('NFL','NCAAF') else 10) or not .60<=r.get('probability',0)<=.97 or (r.get('hit_rate') or 0)<.45:continue
-   flags=[f.lower() for f in r.get('flags',[])]
-   if any(f in bad and f!='teammate usage unresolved' for f in flags):continue
-   if 'teammate usage unresolved' not in flags:continue
-   margin=min(.25,r.get('probability_margin',.08)+.05)
-   pool.append(dict(r,selection_tier='Conditional research: teammate usage unresolved',selection_note='Strict screen found no pick for this sport. Usage uncertainty remains unresolved; an additional 5 percentage-point heuristic buffer is applied. This is not calibrated confidence or a verified value bet.',probability_margin=margin,probability_floor=max(.01,r['probability']-margin)))
+ # Do not relax unresolved-role exclusions merely to fill the board.
  return sorted(pool,key=lambda r:(r.get('selection_tier') is None,min(r.get('probability_floor',0),r.get('hit_rate',0)),r.get('sample',0)),reverse=True)
 
 
