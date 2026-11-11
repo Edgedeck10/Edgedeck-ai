@@ -13,5 +13,16 @@ const entries=[
 ['Price edge',quoted?'Observed '+r.bookmaker+' '+odd(r.odds)+': model edge '+fmt(100*(r.probability-implied(r.odds)))+' pp. Quote freshness and availability must be rechecked.':'No verified market price: a favorable projection is not a demonstrated betting edge. Enter actual odds in Model logic to assess price-dependent value.'],
 ['Failure cases',(r.flags||[]).join('; ')||'Role changes, limited minutes/opportunities, lineup changes and model error can invalidate the projection.']
 ];
-return '<details class="pick-context"><summary>Matchup & edge evidence · all factors</summary><p class="small">'+(current?'Current refresh evidence, not a rewrite of the frozen selection.':'Frozen snapshot only; missing current inputs stay unavailable.')+'</p><dl>'+entries.map(([k,v])=>'<dt>'+esc(k)+'</dt><dd>'+esc(v)+'</dd>').join('')+'</dl></details>';
+return opportunityMarkup(r)+'<details class="pick-context"><summary>Matchup & edge evidence · all factors</summary><p class="small">'+(current?'Current refresh evidence, not a rewrite of the frozen selection.':'Frozen snapshot only; missing current inputs stay unavailable.')+'</p><dl>'+entries.map(([k,v])=>'<dt>'+esc(k)+'</dt><dd>'+esc(v)+'</dd>').join('')+'</dl></details>';
+}
+
+
+function opportunityMarkup(r){
+ const a=(r.context||r.rationale?.context||{}).opportunity_framework;
+ if(!a)return '';
+ const windows=Object.entries(a.windows||{}).map(([n,x])=>`Last ${n}: ${x.games} games, average ${fmt(x.mean)}, median ${fmt(x.median)}, rate ${fmt(x.rate)}, opportunities ${fmt(x.opportunities)}`).join('; ');
+ const changes=Object.entries(a.adjustments||{}).map(([k,v])=>k.replaceAll('_',' ')+' ×'+fmt(v)).join('; ');
+ const splits=Object.entries(a.splits||{}).map(([k,x])=>k+': '+x.games+' games, average '+fmt(x.mean)+', opportunities '+fmt(x.opportunities)).join('; ');
+ const receiving=a.receiving?`<p>Measured receiving components: ${a.receiving.games} games; catch rate ${pct(a.receiving.catch_rate)}; yards/reception ${fmt(a.receiving.yards_per_reception)}. ${esc(a.receiving.note)}</p>`:'';
+ return `<details class="pick-context"><summary>Opportunity × efficiency · projection breakdown</summary><p>${esc(a.method)}</p><dl><dt>Base production</dt><dd>${fmt(r.rate)} per ${esc(a.unit)} × ${fmt(r.expected_exposure)} = ${fmt(a.base_projection)} before adjustments; final ${fmt(r.projection)} versus ${esc(r.side)} ${fmt(r.line)}.</dd><dt>Applied adjustments</dt><dd>${esc(changes)}</dd><dt>Recent windows</dt><dd>${esc(windows)}. Windows overlap and are descriptive.</dd><dt>Comparable sample</dt><dd>${a.sample?.games||0} games; median ${fmt(a.median)}, SD ${fmt(a.sd)}, range ${fmt(a.min)}–${fmt(a.max)}. Averages alone do not establish clearing probability.</dd><dt>Venue splits</dt><dd>${esc(splits)}. Small splits do not prove an advantage.</dd><dt>Advanced inputs unavailable</dt><dd>${esc((a.missing||[]).join('; '))||'No additional advanced feed connected.'}. Missing inputs are not assumed favorable.</dd></dl>${receiving}<p class="small">Adapted from your Sports Betting Metrics framework. Illustrative 30/20/20/15/10/5 weights were not fitted or used to inflate confidence. Probabilities and forward validation remain separate from descriptive history.</p></details>`;
 }

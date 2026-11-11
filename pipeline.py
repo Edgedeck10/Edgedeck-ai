@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 import analytics as an
 import daily_picks as daily
 import pick_evidence
+import opportunity_metrics
 import news_feed
 import extra_fixtures
 import copy
@@ -269,6 +270,7 @@ def player_rows(events,e,box,injuries,history):
     g=events.get(x['event_id']);other=g['away' if x['venue']=='home' else 'home'] if g else {}
     logs.append({'date':x['start'],'value':v,'opponent':other.get('abbr') or other.get('name','Unknown'),'opponent_id':other.get('id'),'venue':x['venue'],'minutes':x['stats'].get('Minutes'),'event_id':x['event_id']})
    PLAYER_LOGS[log_key]={'games':logs[-25:],'opponent_id':opp['id'],'opponent':opp['name'],'residuals':model['residuals'],'sample':len(vals)}
+   opportunity=opportunity_metrics.framework(pairs,market,e['sport'],model)
    for line in sorted(lines):
     for side in ('Over',):
      hits=[int(v>line) if side=='Over' else int(v<line) for v in vals];streak=0
@@ -276,7 +278,7 @@ def player_rows(events,e,box,injuries,history):
       if not hit:break
       streak+=1
      ci_low,ci_high=wilson(sum(hits),len(hits));raw=an.tail_probability(line,side,projection,sig,model['residuals'])
-     chart_context={**ctx,'position':pos,'opponent_position':matchup,'exposure_unit':model['unit'],'expected_exposure':model['exposure'],'baseline_exposure':model['baseline_exposure'],'last5_exposure':model['last5_exposure'],'baseline_rate':model['baseline_rate'],'last5_rate':model['last5_rate'],'base_projection':model['base_projection'],'adjustments':model['adjustments'],'teammate_absences':[z['player'] for z in absence],'absence_split_games':model['absence_split_games'],'sample_audit':audit,'weather':weather}
+     chart_context={**ctx,'opportunity_framework':opportunity,'position':pos,'opponent_position':matchup,'exposure_unit':model['unit'],'expected_exposure':model['exposure'],'baseline_exposure':model['baseline_exposure'],'last5_exposure':model['last5_exposure'],'baseline_rate':model['baseline_rate'],'last5_rate':model['last5_rate'],'base_projection':model['base_projection'],'adjustments':model['adjustments'],'teammate_absences':[z['player'] for z in absence],'absence_split_games':model['absence_split_games'],'sample_audit':audit,'weather':weather}
      r=make_row(e,market,side,line,projection,sig,history,raw_override=raw,player_id=pid,player=latest['player'],selection=latest['player'],team_id=latest['team_id'],position=pos,sample=len(vals),flags=list(model['flags']),source_url=latest['source_url'],injury_status=status,baseline=round(baseline,2),last5=round(last5,2),trend_pct=round((last5/baseline-1)*100,1) if baseline else 0,hit_rate=round(mean(hits),4),hit_rate_low=ci_low,hit_rate_high=ci_high,last5_hits=sum(hits[-5:]),last10_hits=sum(hits[-10:]),streak=streak,projected_minutes=round(model['exposure'],1) if model['unit']=='Minutes' and model['exposure'] else None,per_minute=round(model['rate'],4) if model['unit']=='Minutes' and model['rate'] is not None else None,rate=model['rate'],exposure_unit=model['unit'],expected_exposure=model['exposure'],probability_margin=model['probability_margin'],log_key=log_key,context=chart_context,reasoning='Projected opportunities × recent/season-window production rate × shrunk opponent allowance for the same position and stat. Venue splits require data; rest is a modest heuristic. Teammate usage only adjusts with recorded DNP split evidence. Empirical residuals and a normal tail form a provisional ensemble; uncertainty is priced explicitly.')
      neutral=an.tail_probability(line,side,baseline,max(st.pstdev(vals),.8),[v-baseline for v in vals]);market_proxy=clip(neutral*1.04,.025,.975)
      r['estimated_price']=fair(market_proxy);r['estimated_price_method']='Historical baseline probability with illustrative 4% overround; not a sportsbook-fitted quote.'
@@ -503,3 +505,4 @@ def main():
  write('events.json',events);record_store.write_history(DATA,history);record_store.write_report(DATA,report);write('cache.json',cache);write('shortlist_history.json',shortlist);write('daily_history.json',daily_ledger);write('research_ticket_history.json',research_ledger);write('cross_sport_history.json',cross_ledger);write('perfect_ticket_history.json',perfect_ledger);write('estimated_best_history.json',estimated_ledger)
  print(f'{len(future)} upcoming games | {len(rows)} lines | {sum(bool(r.get("player_id")) for r in rows)} player lines | {len(settled)} settled | {len(ERRORS)} feed errors')
 if __name__=='__main__':main()
+
