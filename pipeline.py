@@ -432,6 +432,8 @@ def main():
  research_current,research_summary=daily.update_research(research_ledger,research,TODAY.isoformat(),NOW.isoformat(),events,box,settle)
  research_current=copy.deepcopy(research_current)
  for ticket in research_current:ticket['current_review']=news_feed.review(ticket,rows,events,injuries,news,NOW.isoformat())
+ perfect_current=copy.deepcopy(perfect_current)
+ for ticket in perfect_current:ticket['current_review']=news_feed.review(ticket,rows,events,injuries,news,NOW.isoformat())
  # A fresh review is separate from immutable forecast fields.
  daily_current=copy.deepcopy(daily_current)
  for ticket in daily_current:ticket['current_review']=news_feed.review(ticket,rows,events,injuries,news,NOW.isoformat())
