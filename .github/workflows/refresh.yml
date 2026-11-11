@@ -26,7 +26,11 @@ jobs:
         with:
           python-version: '3.12'
       - name: Verify model and settlement logic
-        run: python -m unittest test_pipeline.py
+        run: |
+          python -m unittest test_pipeline.py
+          node --check app.js
+          node --check analysis-ui.js
+          node test_ui.cjs
       - name: Collect scores, grade history, calibrate predictions
         run: python pipeline.py
       - name: Preserve prediction history
@@ -44,7 +48,7 @@ jobs:
       - name: Prepare public dashboard
         run: |
           mkdir -p _site/data
-          cp index.html style.css app.js manifest.webmanifest icon.svg _site/
+          cp index.html style.css app.js analysis-ui.js manifest.webmanifest icon.svg _site/
           cp data/latest.json data/history.json data/shortlist_history.json _site/data/
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3

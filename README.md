@@ -26,3 +26,16 @@ The public archive records all supported suggested thresholds, including both ov
 
 ## Privacy
 Repository and automatic forecasts are public. Personal imported lines remain in localStorage on the current browser, are not uploaded, and can be exported or removed. Never import account credentials or API keys. The app opens research/sportsbook home pages; it never sends or places wagers.
+
+## Version 3 — price-sensitive positional model
+Basketball props now use recent/available-window rate × expected minutes. Each stat and observed combo gets a shrunk opponent allowance per position-minute compared to the same-position league baseline. Current roster positions fill legacy box records; role buckets are not actual defender assignments. Per-minute allowances already contain observed pace, so no second pace factor is stacked. Football uses attempts/targets where available; hockey uses time on ice / shots faced. Missing opportunities fall back to per-game data and are flagged. Venue effects require three games on each side. Teammate absence adjustments require observed DNP split evidence, otherwise uncertainty is widened. Rest adjustments are small explicit heuristics.
+
+Probability is a provisional ensemble of an uncertainty-inflated normal distribution and a smoothed empirical residual tail. All new forecasts have model version 3.0.0; old forecast values/results remain intact.
+
+Rank actual quotes in +100 to -1500 first. A provisional value screen requires >=3 pp probability edge, >=5% expected ROI, and positive edge after a 3–12 pp heuristic model-risk buffer. That buffer is not a statistically validated prediction interval. Stale quotes and prices outside the band are excluded from the default value screen. Unpriced props are price-check targets: an illustrative historical baseline price adds a hypothetical 4% overround; this is neither a sportsbook-trained anticipated quote nor a verified market edge. The exact-line lab accepts real odds and recalculates value.
+
+Cards include measured historical SVG game logs. The detail workspace supports last 10/15/25 available games, actual opponent/date labels, current-line overlay and head-to-head filter. Short samples are labeled; games are never filled in. Alternate-line tables distinguish true observed quotes, illustrative baseline estimates and model fair prices; conditional-price scenarios show +100 through -1500 at the same threshold.
+
+Theme: navy/Irish-green background with cream/gold workspaces and subtle shamrock accents. Native static SVG charts require no image API or paid service.
+
+Validation: 14 Python tests plus JavaScript tests of quote-sensitive value, risk buffering, price bands, unquoted edge, head-to-head filtering and chart sample integrity.

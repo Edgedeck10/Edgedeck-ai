@@ -5,11 +5,12 @@ import json, math, pathlib, datetime as dt, urllib.request, statistics as st, re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import defaultdict
 from zoneinfo import ZoneInfo
+import analytics as an
 ROOT=pathlib.Path(__file__).parent; DATA=ROOT/'data'; DATA.mkdir(exist_ok=True)
 NOW=dt.datetime.now(dt.timezone.utc); TODAY=NOW.astimezone(ZoneInfo('America/Indiana/Indianapolis')).date()
 SPORTS={'NBA':'basketball/nba','NFL':'football/nfl','NHL':'hockey/nhl','MLB':'baseball/mlb','NCAAF':'football/college-football','NCAAB':'basketball/mens-college-basketball','WNBA':'basketball/wnba','EPL':'soccer/eng.1','MLS':'soccer/usa.1'}
 DEFAULTS={'NBA':(112,15),'NCAAB':(74,12),'WNBA':(81,12),'NFL':(23,10),'NCAAF':(28,15),'MLB':(4.5,3),'NHL':(3,1.8),'EPL':(1.4,1.3),'MLS':(1.5,1.4)}
-MODEL='2.0.1'; ERRORS=[]; CAL_CACHE={}
+MODEL='3.0.0'; ERRORS=[]; CAL_CACHE={}; PLAYER_LOGS={}; MATCHUP_INDEX=None; POSITIONS={}
 def read(n,d):
  try:return json.loads((DATA/n).read_text())
  except (ValueError,OSError):return d
@@ -62,7 +63,8 @@ def parse_box(d,e):
   for group in block.get('statistics',[]):
    labels=group.get('labels') or group.get('names') or [];category=group.get('name','')
    for a in group.get('athletes',[]):
-    if a.get('didNotPlay'):continue
+    if a.get('didNotPlay'):
+     athlete=a.get('athlete',{});rows.append({'player_id':str(athlete.get('id','')),'player':athlete.get('displayName',''),'position':athlete.get('position',{}).get('abbreviation'),'team_id':tid,'event_id':e['id'],'start':e['start'],'sport':e['sport'],'stats':{},'did_not_play':True});continue
     raw=dict(zip(labels,a.get('stats',[])));stats={}
     mapping={'PTS':'Points','REB':'Rebounds','AST':'Assists','STL':'Steals','BLK':'Blocks','TO':'Turnovers','SOG':'Shots on goal','SV':'Saves','G':'Goals','A':'Assists','H':'Hits','R':'Runs','RBI':'RBIs','HR':'Home runs','BB':'Walks','SO':'Strikeouts','K':'Strikeouts','REC':'Receptions'}
     for k,v in raw.items():
@@ -76,9 +78,17 @@ def parse_box(d,e):
      if key and num(raw['YDS']) is not None:stats[key]=num(raw['YDS'])
     if 'TD' in raw and category in ('rushing','receiving'):stats['Touchdowns']=num(raw['TD']) or 0
     if 'C/ATT' in raw:stats['Completions']=num(str(raw['C/ATT']).split('/')[0]) or 0
+    for label,key in [('ATT','Rush attempts'),('CAR','Rush attempts'),('TGT','Targets'),('TGTS','Targets'),('PA','Plate appearances'),('AB','Plate appearances'),('SA','Shots faced')]:
+     if label in raw and num(raw[label]) is not None:stats[key]=num(raw[label])
+    if 'C/ATT' in raw:stats['Pass attempts']=num(str(raw['C/ATT']).split('/')[-1])
+    if 'TOI' in raw:
+     parts=str(raw['TOI']).split(':');stats['Minutes']=(num(parts[0]) or 0)+(num(parts[1]) or 0)/60 if len(parts)>1 else num(raw['TOI'])
+    if 'IP' in raw and num(raw['IP']) is not None:
+     text=str(raw['IP']);whole,_,partial=text.partition('.');stats['Innings']=float(whole)+(int(partial or 0)/3)
+    if 'Rush attempts' in stats or 'Receptions' in stats:stats['Touches']=(stats.get('Rush attempts') or 0)+(stats.get('Receptions') or 0)
     if not stats:continue
     athlete=a.get('athlete',{});pid=str(athlete.get('id',''))
-    rows.append({'player_id':pid,'player':athlete.get('displayName',''),'team_id':tid,'event_id':e['id'],'start':e['start'],'sport':e['sport'],'stats':stats,'source_url':next((z['href'] for z in athlete.get('links',[]) if z.get('href','').startswith('https://')),e['source_url'])})
+    rows.append({'player_id':pid,'player':athlete.get('displayName',''),'position':athlete.get('position',{}).get('abbreviation'),'team_id':tid,'event_id':e['id'],'start':e['start'],'sport':e['sport'],'stats':stats,'source_url':next((z['href'] for z in athlete.get('links',[]) if z.get('href','').startswith('https://')),e['source_url'])})
  # Football players can appear in multiple categories. Merge, summing TD only.
  merged={}
  for r in rows:
@@ -136,6 +146,9 @@ def make_row(e,market,side,line,mu,sd,history,**extra):
  row={'id':identifier,'event_id':e['id'],'sport':e['sport'],'event':e['event'],'start':e['start'],'day':e['day'],'market':market,'side':side,'line':line,'projection':round(mu,2),'sd':round(sd,2),'raw_probability':round(raw,5),'probability':round(p,5),'fair_odds':fair(p),'calibration_key':key,'calibration_games':n,'model_version':MODEL,'source_url':e['source_url'],'odds':None,'bookmaker':None,'price_kind':'Suggested line','observed_at':NOW.isoformat(),'sample':0,'flags':[],**extra}
  row['break_even']=round(implied(odds),5) if priced else None;row['edge_pp']=round((p-implied(odds))*100,2) if priced else None;row['expected_roi_pct']=round((p*dec(odds)-1)*100,2) if priced else None
  row['qualified']=bool(priced and n>=100 and row['sample']>=10 and row['edge_pp']>=3 and not row['flags'])
+ row.update(an.value_metrics(p,odds,extra.get('probability_margin',.05)))
+ row['research_score']=round(an.research_score(p,row['probability_margin'],odds,row['sample']),3)
+ row['qualified']=bool(row['value_status']=='Provisional value' and n>=100 and row['sample']>=10 and not row['flags'])
  row['gradeable']=True
  return row
 
@@ -208,49 +221,51 @@ def player_rows(events,e,box,injuries,history):
  records=defaultdict(list)
  for b in box.values():
   for r in b:
-   if r['sport']==e['sport'] and iso(r['start'])<NOW and iso(r['start'])<iso(e['start']):records[r['player_id']].append(r)
+   if not r.get('did_not_play') and r['sport']==e['sport'] and iso(r['start'])<NOW and iso(r['start'])<iso(e['start']):records[r['player_id']].append(r)
  rows=[];tidset={e['home']['id'],e['away']['id']};inj={r['player_id']:r for r in injuries if r['event_id']==e['id']}
  for pid,games in records.items():
   games.sort(key=lambda x:x['start']);latest=games[-1]
   if latest['team_id'] not in tidset or (NOW-iso(latest['start'])).days>45:continue
-  # Most recent team is the best public-boxscore evidence, current roster gate supplied when available.
   if e.get('roster_ids') and pid not in e['roster_ids']:continue
   status=inj.get(pid,{}).get('status','Not listed')
   if status.lower() in ('out','suspension','suspended','injured reserve'):continue
-  recent=games[-20:];sid='home' if latest['team_id']==e['home']['id'] else 'away';mu_team,ctx=team_factors(events,e,sid)
-  mins=[x['stats']['Minutes'] for x in recent if (x['stats'].get('Minutes') or 0)>0];expected_minutes=.65*mean(mins[-5:])+.35*mean(mins) if mins else None
-  if e['sport'] in ('NBA','WNBA','NCAAB') and (expected_minutes is None or expected_minutes<14):continue
-  marketset=BASKET if e['sport'] in ('NBA','WNBA','NCAAB') else OTHER
-  for market in marketset:
-   pairs=[(x,expanded(x['stats']).get(market)) for x in recent];pairs=[(x,v) for x,v in pairs if v is not None]
+  recent=games[-25:];sid='home' if latest['team_id']==e['home']['id'] else 'away';opp=e['away' if sid=='home' else 'home'];_,ctx=team_factors(events,e,sid);ctx['venue']=sid
+  pos=an.position_group(e['sport'],latest.get('position') or POSITIONS.get(e['sport']+':'+pid));absence=[z for z in injuries if z['event_id']==e['id'] and z['team_id']==latest['team_id'] and z['status'].lower()=='out']
+  mins=[x['stats']['Minutes'] for x in recent if (x['stats'].get('Minutes') or 0)>0]
+  if e['sport'] in an.BASKET and (not mins or mean(mins[-5:])<14):continue
+  for market in (BASKET if e['sport'] in an.BASKET else OTHER):
+   pairs=[]
+   for x in recent:
+    v=expanded(x['stats']).get(market)
+    if v is None:continue
+    g=events.get(x['event_id']);own_side='home' if g and g['home']['id']==x['team_id'] else 'away'
+    pairs.append(({**x,'venue':own_side},v))
    if len(pairs)<5:continue
-   vals=[v for _,v in pairs];baseline=mean(vals);last5=mean(vals[-5:]);projection=.65*last5+.35*baseline
-   rate=None
-   if expected_minutes and all((x['stats'].get('Minutes') or 0)>0 for x,_ in pairs):
-    rate=sum(v for x,v in pairs)/sum(x['stats']['Minutes'] for x,_ in pairs);projection=.6*(rate*expected_minutes)+.4*projection
-   # Team points allowed is a limited proxy, do not use it for rebounds or assists.
-   defense=1
-   if market=='Points':
-    defense=clip(ctx['opponent_allowed']/DEFAULTS[e['sport']][0],.92,1.08);projection*=defense
-   if ctx['back_to_back']:projection*=.98
-   sig=max(st.pstdev(vals)*math.sqrt(1+1/len(vals)),math.sqrt(max(projection,1))*.7,1)
-   # Inflate uncertainty when role/minutes changed or an injury report is unresolved.
-   flag=[]
-   if len(vals)<10:flag.append('Small sample')
-   if status.lower() not in ('not listed','active','available','probable'):flag.append(status)
-   if expected_minutes and abs(mean(mins[-3:])-mean(mins))>4:flag.append('Minutes volatility');sig*=1.15
-   if flag and status.lower() not in ('not listed','active','available','probable'):sig*=1.2
-   step=BASKET[market][1] if market in BASKET else OTHER[market]
-   center=max(1,round(projection/step)*step)
-   lines={max(.5,center-.5),max(.5,math.floor((projection-1.282*sig)/step)*step-.5),max(.5,math.floor((projection-.675*sig)/step)*step-.5)}
+   unit,_=an.opportunities(market,e['sport'],pairs[-1][0]['stats'])
+   matchup=an.opponent_adjustment(MATCHUP_INDEX,e['sport'],opp['id'],pos,market,unit)
+   model=an.projection(pairs,market,e['sport'],ctx,matchup,status,[z['player_id'] for z in absence],box)
+   projection,sig=model['mu'],model['sd'];vals=[v for _,v in pairs];baseline=mean(vals);last5=mean(vals[-5:]);step=BASKET[market][1] if market in BASKET else OTHER[market]
+   # Near-even to heavy-favorite alternate targets, on both sides of the projection.
+   lines={max(.5,round(projection/step)*step-.5)}
+   for z in (-1.2,-.55,.55,1.2):lines.add(max(.5,round((projection+z*sig)/step)*step-.5))
+   log_key=e['id']+':'+pid+':'+market;logs=[]
+   for x,v in pairs:
+    g=events.get(x['event_id']);other=g['away' if x['venue']=='home' else 'home'] if g else {}
+    logs.append({'date':x['start'],'value':v,'opponent':other.get('abbr') or other.get('name','Unknown'),'opponent_id':other.get('id'),'venue':x['venue'],'minutes':x['stats'].get('Minutes'),'event_id':x['event_id']})
+   PLAYER_LOGS[log_key]={'games':logs,'opponent_id':opp['id'],'opponent':opp['name'],'residuals':model['residuals'],'sample':len(vals)}
    for line in sorted(lines):
     for side in ('Over','Under'):
      hits=[int(v>line) if side=='Over' else int(v<line) for v in vals];streak=0
      for hit in reversed(hits):
       if not hit:break
       streak+=1
-     ci_low,ci_high=wilson(sum(hits),len(hits))
-     r=make_row(e,market,side,line,projection,sig,history,player_id=pid,player=latest['player'],selection=latest['player'],team_id=latest['team_id'],sample=len(vals),flags=list(flag),source_url=latest['source_url'],injury_status=status,baseline=round(baseline,2),last5=round(last5,2),trend_pct=round((last5/baseline-1)*100,1) if baseline else 0,hit_rate=round(mean(hits),4),hit_rate_low=ci_low,hit_rate_high=ci_high,last5_hits=sum(hits[-5:]),last10_hits=sum(hits[-10:]),streak=streak,recent_values=vals[-10:],projected_minutes=round(expected_minutes,1) if expected_minutes else None,per_minute=round(rate,3) if rate is not None else None,context={**ctx,'venue':sid,'defense_multiplier':round(defense,3),'teammate_absences':[z['player'] for z in injuries if z['event_id']==e['id'] and z['team_id']==latest['team_id'] and z['status'].lower()=='out']},reasoning='Recent 5 + available season-window form, minutes × per-minute production where available, basketball rest adjustment. Points use opponent team points allowed. Teammate absences flagged; usage redistribution and position-specific defense are not yet modeled.')
+     ci_low,ci_high=wilson(sum(hits),len(hits));raw=an.tail_probability(line,side,projection,sig,model['residuals'])
+     chart_context={**ctx,'position':pos,'opponent_position':matchup,'exposure_unit':model['unit'],'expected_exposure':model['exposure'],'baseline_exposure':model['baseline_exposure'],'last5_exposure':model['last5_exposure'],'baseline_rate':model['baseline_rate'],'last5_rate':model['last5_rate'],'base_projection':model['base_projection'],'adjustments':model['adjustments'],'teammate_absences':[z['player'] for z in absence],'absence_split_games':model['absence_split_games']}
+     r=make_row(e,market,side,line,projection,sig,history,raw_override=raw,player_id=pid,player=latest['player'],selection=latest['player'],team_id=latest['team_id'],position=pos,sample=len(vals),flags=list(model['flags']),source_url=latest['source_url'],injury_status=status,baseline=round(baseline,2),last5=round(last5,2),trend_pct=round((last5/baseline-1)*100,1) if baseline else 0,hit_rate=round(mean(hits),4),hit_rate_low=ci_low,hit_rate_high=ci_high,last5_hits=sum(hits[-5:]),last10_hits=sum(hits[-10:]),streak=streak,projected_minutes=round(model['exposure'],1) if model['unit']=='Minutes' and model['exposure'] else None,per_minute=round(model['rate'],4) if model['unit']=='Minutes' and model['rate'] is not None else None,rate=model['rate'],exposure_unit=model['unit'],expected_exposure=model['exposure'],probability_margin=model['probability_margin'],log_key=log_key,context=chart_context,reasoning='Projected opportunities × recent/season-window production rate × shrunk opponent allowance for the same position and stat. Venue splits require data; rest is a modest heuristic. Teammate usage only adjusts with recorded DNP split evidence. Empirical residuals and a normal tail form a provisional ensemble; uncertainty is priced explicitly.')
+     neutral=an.tail_probability(line,side,baseline,max(st.pstdev(vals),.8),[v-baseline for v in vals]);market_proxy=clip(neutral*1.04,.025,.975)
+     r['estimated_price']=fair(market_proxy);r['estimated_price_method']='Historical baseline probability with illustrative 4% overround; not a sportsbook-fitted quote.'
+     r['conditional_edge_pp']=round((r['probability']-market_proxy)*100,2);r['conditional_roi_pct']=round((r['probability']*an.decimal(r['estimated_price'])-1)*100,2)
+     if r['odds'] is None:r['research_score']=round(r['conditional_roi_pct']-r['probability_margin']*100+min(r['sample'],25)*.1,3)
      rows.append(r)
  return rows
 
@@ -281,6 +296,7 @@ def settle(r,e,box):
  return int(actual>line) if side=='Over' else int(actual<line)
 
 def main():
+ global MATCHUP_INDEX,POSITIONS
  events=read('events.json',{});history=read('history.json',[]);shortlist=read('shortlist_history.json',[]);cache=read('cache.json',{'box':{},'schedules':{},'rosters':{}});box=cache['box']
  # Normalize legacy records; keep existing immutable forecast probabilities.
  for e in events.values():
@@ -315,10 +331,16 @@ def main():
  jobs=[]
  for sport,tid in teams:
   key=sport+':'+tid
-  if sport in ('NBA','WNBA','NCAAB') and cache['rosters'].get(key,{}).get('day')!=TODAY.isoformat():jobs.append((key,roster,(sport,tid)))
+  if (cache['rosters'].get(key,{}).get('day')!=TODAY.isoformat() or not cache['rosters'].get(key,{}).get('positions')):jobs.append((key,roster,(sport,tid)))
  for key,d in parallel(jobs):
-  athletes=d.get('athletes',[]);ids=[str(a['id']) for a in athletes if 'id' in a]
-  if ids:cache['rosters'][key]={'day':TODAY.isoformat(),'ids':ids}
+  athletes=[]
+  for item in d.get('athletes',[]):
+   athletes.extend(item.get('items',[])) if 'items' in item else athletes.append(item)
+  ids=[str(a['id']) for a in athletes if 'id' in a];positions={str(a['id']):a.get('position',{}).get('abbreviation','Unknown') for a in athletes if 'id' in a}
+  if ids:cache['rosters'][key]={'day':TODAY.isoformat(),'ids':ids,'positions':positions}
+ for key,r in cache['rosters'].items():
+  sport=key.split(':')[0]
+  for pid,pos in r.get('positions',{}).items():POSITIONS[sport+':'+pid]=pos
  for e in future:
   ids=sum([cache['rosters'].get(e['sport']+':'+e[s]['id'],{}).get('ids',[]) for s in ('home','away')],[])
   if ids:e['roster_ids']=ids
@@ -327,8 +349,10 @@ def main():
  for e in future:
   if e['sport'] not in ('NBA','WNBA','NFL','NHL','MLB','NCAAF','NCAAB'):continue
   for side in ('home','away'):
-   for g in team_past(events,e,e[side]['id'])[-12:]:
-    if not box.get(g['id']):needed[g['id']]=g
+   for g in team_past(events,e,e[side]['id'])[-25:]:
+    existing=box.get(g['id'],[])
+    migrate=g['sport'] in ('NFL','NCAAF','NHL','MLB') and existing and not any(x.get('schema_version')==3 for x in existing)
+    if not existing or migrate:needed[g['id']]=g
  for r in history:
   if r.get('outcome') is None and r.get('player_id') and r['event_id'] in events and events[r['event_id']].get('final'):needed[r['event_id']]=events[r['event_id']]
  # Prioritize NBA player model on initial backfill, then other leagues. 180 max per run.
@@ -340,7 +364,9 @@ def main():
    for side in ('home','away'):
     if observed[side].get('periods'):events[key][side]['periods']=observed[side]['periods']
   rows=parse_box(d,events[key])
-  if rows:box[key]=rows
+  if rows:
+   for r in rows:r['schema_version']=3
+   box[key]=rows
  write('cache.json',cache);write('events.json',events)
  # Pregame summaries supply fresh injury flags and fallback odds snapshots.
  injuries=[]
@@ -355,12 +381,14 @@ def main():
   result=settle(r,e,box)
   if result is not None:
    r['outcome']=result;r['graded_at']=NOW.isoformat();r['profit_units']=0 if result=='push' else round(dec(r['odds'])-1 if result else -1,4) if r.get('odds') else None
+ MATCHUP_INDEX=an.build_matchups(events,box,POSITIONS,expanded,NOW.isoformat())
  rows=[]
  for e in future:
   rows+=team_rows(events,e,history);rows+=player_rows(events,e,box,injuries,history)
  # Freeze a separate recommended portfolio, one first selection per game.
- candidates=[r for r in rows if r.get('player_id') and r['market'] in ('Points','Rebounds','Assists','PRA','Points + rebounds','Points + assists','Rebounds + assists','Passing yards','Rushing yards','Receiving yards','Receptions','Shots on goal') and r['side']=='Over' and r['sample']>=5 and .75<=r['probability']<=.94 and r['line']>={'Points':9.5,'Rebounds':2.5,'Assists':1.5,'PRA':14.5,'Points + rebounds':9.5,'Points + assists':9.5,'Rebounds + assists':3.5}.get(r['market'],.5) and not any(x.lower() in ('questionable','doubtful','out') for x in r['flags'])]
- candidates.sort(key=lambda r:(r['probability']+min(r['sample'],20)*.005),reverse=True)
+ priced_candidates=[r for r in rows if r.get('value_status')=='Provisional value' and r['sample']>=8 and not any(x.lower() in ('questionable','doubtful','out','minutes volatility') for x in r['flags'])]
+ unpriced_candidates=[r for r in rows if r.get('player_id') and r.get('odds') is None and r['sample']>=8 and .52<=r['probability'] and an.price_in_band(r.get('estimated_price')) and not any(x.lower() in ('questionable','doubtful','out','minutes volatility') for x in r['flags'])]
+ candidates=sorted(priced_candidates,key=lambda r:r['research_score'],reverse=True)+sorted(unpriced_candidates,key=lambda r:r['research_score'],reverse=True)
  portfolio_seen={r['event_id'] for r in shortlist if r.get('model_version')==MODEL};featured=[];featured_games=set()
  for r in candidates:
   if r['event_id'] in featured_games:continue
@@ -382,8 +410,10 @@ def main():
  for lo in (0,.5,.6,.7,.8,.9):
   hi=.5 if lo==0 else lo+.1;rs=[r for r in settled if lo<=r['probability']<hi];bins.append({'from':lo,'to':round(hi,2),'n':len(rs),'predicted':mean([r['probability'] for r in rs],None),'actual':mean([r['outcome'] for r in rs],None)})
  featured_settled=[r for r in shortlist if r.get('outcome') in (0,1)]
- report={'featured_ids':featured,'portfolio_metrics':{'tracked':len(shortlist),'settled':len(featured_settled),'won':sum(r['outcome'] for r in featured_settled),'hit_ratio':mean([r['outcome'] for r in featured_settled],None),'brier':mean([(r['probability']-r['outcome'])**2 for r in featured_settled],None)},'version':MODEL,'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'refresh_minutes':15,'recommendations':rows,'games':future,'injuries':injuries,'metrics':{'tracked_predictions':len(history),'settled_predictions':len(settled),'won':sum(r['outcome'] for r in settled),'brier_score':round(brier,4) if brier is not None else None,'independent_groups':len(groups),'priced_settled':len(priced),'realized_roi_pct':round(100*sum(r['profit_units'] for r in priced)/len(priced),2) if priced else None},'calibration_bins':bins,'coverage':list(SPORTS),'source':'ESPN public scoreboards / boxscores / injury reports; DraftKings game odds where supplied by ESPN','errors':ERRORS,'backfill_remaining':max(0,len(needed)-len(target)),'limitations':['Player-prop prices are not provided by the free game feed. Suggested lines are model thresholds, not sportsbook offers.','Normal-distribution model estimates are provisional, especially for rare events. No 90% estimate is validated yet.','Injury status and teammate absences are flags; confirmed rotations, player usage redistribution and position-specific defense are not modeled.','No automatic odds feeds for golf, tennis or UFC; exact markets can be imported locally.','Missing player participation remains pending for review, never automatically graded as a loss.']}
+ report={'player_logs':PLAYER_LOGS,'ranking_policy':{'odds_min':-1500,'odds_max':100,'min_edge_pp':3,'min_roi_pct':5,'description':'Actual quoted prices first; require positive buffered edge. Unpriced lines are price-check research targets, never verified bets.'},'featured_ids':featured,'portfolio_metrics':{'tracked':len(shortlist),'settled':len(featured_settled),'won':sum(r['outcome'] for r in featured_settled),'hit_ratio':mean([r['outcome'] for r in featured_settled],None),'brier':mean([(r['probability']-r['outcome'])**2 for r in featured_settled],None)},'version':MODEL,'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'refresh_minutes':15,'recommendations':rows,'games':future,'injuries':injuries,'metrics':{'tracked_predictions':len(history),'settled_predictions':len(settled),'won':sum(r['outcome'] for r in settled),'brier_score':round(brier,4) if brier is not None else None,'independent_groups':len(groups),'priced_settled':len(priced),'realized_roi_pct':round(100*sum(r['profit_units'] for r in priced)/len(priced),2) if priced else None},'calibration_bins':bins,'coverage':list(SPORTS),'source':'ESPN public scoreboards / boxscores / injury reports; DraftKings game odds where supplied by ESPN','errors':ERRORS,'backfill_remaining':max(0,len(needed)-len(target)),'limitations':['Player-prop prices are not provided by the free game feed. Suggested lines are model thresholds, not sportsbook offers.','Normal-distribution model estimates are provisional, especially for rare events. No 90% estimate is validated yet.','Position defense uses roster role buckets, not player tracking or confirmed individual matchups. Opportunity data gaps are neutral adjustments, not fabricated inputs.','No automatic odds feeds for golf, tennis or UFC; exact markets can be imported locally.','Missing player participation remains pending for review, never automatically graded as a loss.']}
  # No destructive retention of forecast history. Cache excludes bulky raw feed payloads.
+ keep={'id','event_id','sport','selection','player_id','market','side','line','team_id','start','day','probability','raw_probability','odds','bookmaker','model_version','calibration_key','predicted_at','outcome','graded_at','profit_units','probability_floor','probability_margin','value_status','edge_pp','expected_roi_pct'}
+ history=[{k:v for k,v in r.items() if k in keep} for r in history]
  write('events.json',events);write('history.json',history);write('latest.json',report);write('cache.json',cache);write('shortlist_history.json',shortlist)
  print(f'{len(future)} upcoming games | {len(rows)} lines | {sum(bool(r.get("player_id")) for r in rows)} player lines | {len(settled)} settled | {len(ERRORS)} feed errors')
 if __name__=='__main__':main()
