@@ -328,6 +328,11 @@ def main():
  # Prioritize NBA player model on initial backfill, then other leagues. 180 max per run.
  target=sorted(needed.values(),key=lambda e:(e['sport']!='NBA',-iso(e['start']).timestamp()))[:180]
  for key,d in parallel([(e['id'],summary,(e,)) for e in target]):
+  # Keep observed period scores from the summary for first-half/quarter models.
+  observed=event(d.get('header',{}),events[key]['sport']) if d.get('header',{}).get('id') else None
+  if observed:
+   for side in ('home','away'):
+    if observed[side].get('periods'):events[key][side]['periods']=observed[side]['periods']
   rows=parse_box(d,events[key])
   if rows:box[key]=rows
  write('cache.json',cache);write('events.json',events)
