@@ -193,6 +193,11 @@ def team_rows(events,e,history):
 
 BASKET={'Points':(5,1),'Rebounds':(2,1),'Assists':(2,1),'PRA':(5,1),'Points + rebounds':(5,1),'Points + assists':(5,1),'Rebounds + assists':(2,1),'Threes':(1,1),'Steals':(1,1),'Blocks':(1,1)}
 OTHER={'Passing yards':25,'Rushing yards':10,'Receiving yards':10,'Receptions':1,'Completions':2,'Touchdowns':1,'Shots on goal':1,'Saves':2,'Goals':1,'Hits':1,'Runs':1,'RBIs':1,'Home runs':1,'Strikeouts':1}
+def wilson(hits,n):
+ if not n:return None,None
+ z=1.96;ph=hits/n;den=1+z*z/n;center=(ph+z*z/(2*n))/den;half=z*math.sqrt(ph*(1-ph)/n+z*z/(4*n*n))/den
+ return round(max(0,center-half),4),round(min(1,center+half),4)
+
 def expanded(stats):
  s=dict(stats)
  for k,parts in {'PRA':['Points','Rebounds','Assists'],'Points + rebounds':['Points','Rebounds'],'Points + assists':['Points','Assists'],'Rebounds + assists':['Rebounds','Assists']}.items():
@@ -244,7 +249,8 @@ def player_rows(events,e,box,injuries,history):
      for hit in reversed(hits):
       if not hit:break
       streak+=1
-     r=make_row(e,market,side,line,projection,sig,history,player_id=pid,player=latest['player'],selection=latest['player'],team_id=latest['team_id'],sample=len(vals),flags=list(flag),source_url=latest['source_url'],injury_status=status,baseline=round(baseline,2),last5=round(last5,2),trend_pct=round((last5/baseline-1)*100,1) if baseline else 0,hit_rate=round(mean(hits),4),last5_hits=sum(hits[-5:]),last10_hits=sum(hits[-10:]),streak=streak,recent_values=vals[-10:],projected_minutes=round(expected_minutes,1) if expected_minutes else None,per_minute=round(rate,3) if rate is not None else None,context={**ctx,'venue':sid,'defense_multiplier':round(defense,3),'teammate_absences':[z['player'] for z in injuries if z['event_id']==e['id'] and z['team_id']==latest['team_id'] and z['status'].lower()=='out']},reasoning='Recent 5 + available season-window form, minutes × per-minute production where available, basketball rest adjustment. Points use opponent team points allowed. Teammate absences flagged; usage redistribution and position-specific defense are not yet modeled.')
+     ci_low,ci_high=wilson(sum(hits),len(hits))
+     r=make_row(e,market,side,line,projection,sig,history,player_id=pid,player=latest['player'],selection=latest['player'],team_id=latest['team_id'],sample=len(vals),flags=list(flag),source_url=latest['source_url'],injury_status=status,baseline=round(baseline,2),last5=round(last5,2),trend_pct=round((last5/baseline-1)*100,1) if baseline else 0,hit_rate=round(mean(hits),4),hit_rate_low=ci_low,hit_rate_high=ci_high,last5_hits=sum(hits[-5:]),last10_hits=sum(hits[-10:]),streak=streak,recent_values=vals[-10:],projected_minutes=round(expected_minutes,1) if expected_minutes else None,per_minute=round(rate,3) if rate is not None else None,context={**ctx,'venue':sid,'defense_multiplier':round(defense,3),'teammate_absences':[z['player'] for z in injuries if z['event_id']==e['id'] and z['team_id']==latest['team_id'] and z['status'].lower()=='out']},reasoning='Recent 5 + available season-window form, minutes × per-minute production where available, basketball rest adjustment. Points use opponent team points allowed. Teammate absences flagged; usage redistribution and position-specific defense are not yet modeled.')
      rows.append(r)
  return rows
 
