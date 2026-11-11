@@ -47,13 +47,13 @@ def in_selection_day(r,days):
 def estimated_singles(rows,now):
  # Rank confidence at model-fair prices near even money; no book offer or verified value inferred.
  bad=('questionable','doubtful','out','minutes volatility','role changed','outlier-sensitive','starter unconfirmed','opportunity data missing','day-to-day','teammate usage unresolved')
- pool=[r for r in rows if r.get('player_id') and r.get('odds') is None and r.get('side')=='Over' and in_window(r,now) and r.get('sample',0)>=(8 if r.get('sport') in ('NFL','NCAAF') else 10) and .60<=r.get('probability',0)<=.97 and (r.get('hit_rate') or 0)>=.45 and not any(f.lower() in bad for f in r.get('flags',[]))]
+ pool=[r for r in rows if r.get('player_id') and r.get('odds') is None and r.get('side')=='Over' and in_window(r,now) and r.get('sample',0)>=(8 if r.get('sport') in ('NFL','NCAAF') else 10) and .60<=r.get('selection_probability',r.get('probability',0))<=.97 and (r.get('hit_rate') or 0)>=.45 and not any(f.lower() in bad for f in r.get('flags',[]))]
  # Do not relax unresolved-role exclusions merely to fill the board.
  return sorted(pool,key=lambda r:(r.get('selection_tier') is None,min(r.get('probability_floor',0),r.get('hit_rate',0)),r.get('sample',0)),reverse=True)
 
 
 def freeze_leg(r):
- keys=['id','event_id','sport','market','side','line','selection','event','player_id','team_id','start','day','probability','raw_probability','probability_floor','odds','bookmaker','odds_updated','observed_at','edge_pp','conservative_edge_pp','expected_roi_pct','model_version','sample','price_kind','source_url','rationale','projection','sd','probability_margin','entry_price_limit','calibration_games','hit_rate','hit_rate_low','hit_rate_high','log_key','flags','fanduel_verified','book_state','quote_source_url','fanduel_selection_url','fanduel_market_id','fanduel_selection_id','selection_tier','selection_note','fair_odds','estimated_price','estimated_price_method','expected_exposure','exposure_unit','rate']
+ keys=['selection_probability','id','event_id','sport','market','side','line','selection','event','player_id','team_id','start','day','probability','raw_probability','probability_floor','odds','bookmaker','odds_updated','observed_at','edge_pp','conservative_edge_pp','expected_roi_pct','model_version','sample','price_kind','source_url','rationale','projection','sd','probability_margin','entry_price_limit','calibration_games','hit_rate','hit_rate_low','hit_rate_high','log_key','flags','fanduel_verified','book_state','quote_source_url','fanduel_selection_url','fanduel_market_id','fanduel_selection_id','selection_tier','selection_note','fair_odds','estimated_price','estimated_price_method','expected_exposure','exposure_unit','rate']
  return {k:r[k] for k in keys if k in r}|{'outcome':None}
 
 def update(records,rows,day,now,events,box,settle,min_decimal=1):
