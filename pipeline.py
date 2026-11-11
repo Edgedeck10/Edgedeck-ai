@@ -205,7 +205,7 @@ def player_rows(events,e,box,injuries,history):
   status=inj.get(pid,{}).get('status','Not listed')
   if status.lower() in ('out','suspension','suspended','injured reserve'):continue
   recent=games[-20:];sid='home' if latest['team_id']==e['home']['id'] else 'away';mu_team,ctx=team_factors(events,e,sid)
-  mins=[x['stats']['Minutes'] for x in recent if x['stats'].get('Minutes',0)>0];expected_minutes=.65*mean(mins[-5:])+.35*mean(mins) if mins else None
+  mins=[x['stats']['Minutes'] for x in recent if (x['stats'].get('Minutes') or 0)>0];expected_minutes=.65*mean(mins[-5:])+.35*mean(mins) if mins else None
   if e['sport'] in ('NBA','WNBA','NCAAB') and (expected_minutes is None or expected_minutes<14):continue
   marketset=BASKET if e['sport'] in ('NBA','WNBA','NCAAB') else OTHER
   for market in marketset:
@@ -213,7 +213,7 @@ def player_rows(events,e,box,injuries,history):
    if len(pairs)<5:continue
    vals=[v for _,v in pairs];baseline=mean(vals);last5=mean(vals[-5:]);projection=.65*last5+.35*baseline
    rate=None
-   if expected_minutes and all(x['stats'].get('Minutes',0)>0 for x,_ in pairs):
+   if expected_minutes and all((x['stats'].get('Minutes') or 0)>0 for x,_ in pairs):
     rate=sum(v for x,v in pairs)/sum(x['stats']['Minutes'] for x,_ in pairs);projection=.6*(rate*expected_minutes)+.4*projection
    # Team points allowed is a limited proxy, do not use it for rebounds or assists.
    defense=1
@@ -264,7 +264,7 @@ def settle(r,e,box):
  return int(actual>line) if side=='Over' else int(actual<line)
 
 def main():
- events=read('events.json',{});history=read('history.json',[]);cache=read('cache.json',{'box':{},'schedules':{},'rosters':{}});box=cache['box']
+ events=read('events.json',{});history=read('history.json',[]);shortlist=read('shortlist_history.json',[]);cache=read('cache.json',{'box':{},'schedules':{},'rosters':{}});box=cache['box']
  # Normalize legacy records; keep existing immutable forecast probabilities.
  for e in events.values():
   e.setdefault('espn_id',e['id'].split(':')[-1]);e.setdefault('state','post' if e.get('final') else 'pre');e.setdefault('source_url','https://www.espn.com');e.setdefault('odds',[])
@@ -326,7 +326,7 @@ def main():
   e=events[key];injuries+=injury_rows(d,e)
   if not e.get('odds'):e['odds']=d.get('pickcenter',[])
  write('cache.json',cache);write('events.json',events)
- for r in history:
+ for r in history+shortlist:
   if r.get('outcome') is not None:continue
   e=events.get(r['event_id'])
   if not e:continue
@@ -336,6 +336,16 @@ def main():
  rows=[]
  for e in future:
   rows+=team_rows(events,e,history);rows+=player_rows(events,e,box,injuries,history)
+ # Freeze a separate recommended portfolio, one first selection per game.
+ candidates=[r for r in rows if r.get('player_id') and r['market'] in ('Points','Rebounds','Assists','PRA','Points + rebounds','Points + assists','Rebounds + assists','Passing yards','Rushing yards','Receiving yards','Receptions','Shots on goal') and r['side']=='Over' and r['sample']>=5 and r['probability']>=.65 and not any(x.lower() in ('questionable','doubtful','out') for x in r['flags'])]
+ candidates.sort(key=lambda r:(r['probability']+min(r['sample'],20)*.005),reverse=True)
+ portfolio_seen={r['event_id'] for r in shortlist if r.get('model_version')==MODEL};featured=[];featured_games=set()
+ for r in candidates:
+  if r['event_id'] in featured_games:continue
+  featured.append(r['id']);featured_games.add(r['event_id'])
+  if r['event_id'] not in portfolio_seen:
+   shortlist.append({k:v for k,v in r.items() if k not in ('context','reasoning','recent_values')}|{'predicted_at':NOW.isoformat(),'outcome':None});portfolio_seen.add(r['event_id'])
+  if len(featured)>=10:break
  # Record one pregame forecast for each exact suggested line; never mutate it when refreshing.
  seen={r['id'] for r in history}
  for r in rows:
@@ -349,8 +359,9 @@ def main():
  bins=[]
  for lo in (0,.5,.6,.7,.8,.9):
   hi=.5 if lo==0 else lo+.1;rs=[r for r in settled if lo<=r['probability']<hi];bins.append({'from':lo,'to':round(hi,2),'n':len(rs),'predicted':mean([r['probability'] for r in rs],None),'actual':mean([r['outcome'] for r in rs],None)})
- report={'version':MODEL,'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'refresh_minutes':15,'recommendations':rows,'games':future,'injuries':injuries,'metrics':{'tracked_predictions':len(history),'settled_predictions':len(settled),'won':sum(r['outcome'] for r in settled),'brier_score':round(brier,4) if brier is not None else None,'independent_groups':len(groups),'priced_settled':len(priced),'realized_roi_pct':round(100*sum(r['profit_units'] for r in priced)/len(priced),2) if priced else None},'calibration_bins':bins,'coverage':list(SPORTS),'source':'ESPN public scoreboards / boxscores / injury reports; DraftKings game odds where supplied by ESPN','errors':ERRORS,'backfill_remaining':max(0,len(needed)-len(target)),'limitations':['Player-prop prices are not provided by the free game feed. Suggested lines are model thresholds, not sportsbook offers.','Normal-distribution model estimates are provisional, especially for rare events. No 90% estimate is validated yet.','Injury status and teammate absences are flags; confirmed rotations, player usage redistribution and position-specific defense are not modeled.','No automatic odds feeds for golf, tennis or UFC; exact markets can be imported locally.','Missing player participation remains pending for review, never automatically graded as a loss.']}
+ featured_settled=[r for r in shortlist if r.get('outcome') in (0,1)]
+ report={'featured_ids':featured,'portfolio_metrics':{'tracked':len(shortlist),'settled':len(featured_settled),'won':sum(r['outcome'] for r in featured_settled),'hit_ratio':mean([r['outcome'] for r in featured_settled],None),'brier':mean([(r['probability']-r['outcome'])**2 for r in featured_settled],None)},'version':MODEL,'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'refresh_minutes':15,'recommendations':rows,'games':future,'injuries':injuries,'metrics':{'tracked_predictions':len(history),'settled_predictions':len(settled),'won':sum(r['outcome'] for r in settled),'brier_score':round(brier,4) if brier is not None else None,'independent_groups':len(groups),'priced_settled':len(priced),'realized_roi_pct':round(100*sum(r['profit_units'] for r in priced)/len(priced),2) if priced else None},'calibration_bins':bins,'coverage':list(SPORTS),'source':'ESPN public scoreboards / boxscores / injury reports; DraftKings game odds where supplied by ESPN','errors':ERRORS,'backfill_remaining':max(0,len(needed)-len(target)),'limitations':['Player-prop prices are not provided by the free game feed. Suggested lines are model thresholds, not sportsbook offers.','Normal-distribution model estimates are provisional, especially for rare events. No 90% estimate is validated yet.','Injury status and teammate absences are flags; confirmed rotations, player usage redistribution and position-specific defense are not modeled.','No automatic odds feeds for golf, tennis or UFC; exact markets can be imported locally.','Missing player participation remains pending for review, never automatically graded as a loss.']}
  # No destructive retention of forecast history. Cache excludes bulky raw feed payloads.
- write('events.json',events);write('history.json',history);write('latest.json',report);write('cache.json',cache)
+ write('events.json',events);write('history.json',history);write('latest.json',report);write('cache.json',cache);write('shortlist_history.json',shortlist)
  print(f'{len(future)} upcoming games | {len(rows)} lines | {sum(bool(r.get("player_id")) for r in rows)} player lines | {len(settled)} settled | {len(ERRORS)} feed errors')
 if __name__=='__main__':main()
