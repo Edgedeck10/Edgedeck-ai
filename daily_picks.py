@@ -14,7 +14,7 @@ def in_window(r,now):
  except (KeyError,ValueError,TypeError):return False
 
 def eligible(r,day,now,parlay=False):
- if not in_window(r,now) or not (isinstance(r.get('odds'),(int,float)) and ((-1500<=r['odds']<=-100 or 100<=r['odds']<=200) if parlay else price_band(r['odds']))) or r.get('sample',0)<10:return False
+ if not in_window(r,now) or not (isinstance(r.get('odds'),(int,float)) and ((-1500<=r['odds']<=-100 or 100<=r['odds']<=200) if parlay else price_band(r['odds']))) or r.get('sample',0)<(8 if r.get('sport') in ('NFL','NCAAF') and not r.get('player_id') else 10):return False
  if r.get('price_kind')!='Observed snapshot' or r.get('probability',0)<.60:return False
  if any(x.lower() in ('questionable','doubtful','out','minutes volatility','role changed','outlier-sensitive','starter unconfirmed','opportunity data missing','day-to-day','teammate usage unresolved') for x in r.get('flags',[])):return False
  try:

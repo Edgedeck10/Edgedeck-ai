@@ -155,7 +155,7 @@ def make_row(e,market,side,line,mu,sd,history,**extra):
  row={'id':identifier,'event_id':e['id'],'sport':e['sport'],'event':e['event'],'start':e['start'],'day':e['day'],'market':market,'side':side,'line':line,'projection':round(mu,2),'sd':round(sd,2),'raw_probability':round(raw,5),'probability':round(p,5),'fair_odds':fair(p),'calibration_key':key,'calibration_games':n,'model_version':MODEL,'source_url':e['source_url'],'odds':None,'bookmaker':None,'price_kind':'Suggested line','observed_at':NOW.isoformat(),'sample':0,'flags':[],**extra}
  row['break_even']=round(implied(odds),5) if priced else None;row['edge_pp']=round((p-implied(odds))*100,2) if priced else None;row['expected_roi_pct']=round((p*dec(odds)-1)*100,2) if priced else None
  row['qualified']=bool(priced and n>=100 and row['sample']>=10 and row['edge_pp']>=3 and not row['flags'])
- row.update(an.value_metrics(p,odds,extra.get('probability_margin',.05)))
+ row.update(an.value_metrics(p,odds,extra.get('probability_margin',.08 if e['sport'] in ('NFL','NCAAF') and row['sample']<10 else .05)))
  if priced and row['sample']<10:row['value_status']='Insufficient sample'
  elif priced and (row['edge_pp'] or 0)>15:row['value_status']='Review market disagreement'
  row['research_score']=round(an.research_score(p,row['probability_margin'],odds,row['sample']),3)
@@ -417,7 +417,7 @@ def main():
   if daily.eligible(r,TODAY.isoformat(),NOW.isoformat()) or daily.eligible(r,TODAY.isoformat(),NOW.isoformat(),True):r['rationale']=pick_evidence.build(r,events,injuries,PLAYER_LOGS,scores)
  research=[]
  for sport in daily.SPORTS:
-  candidates=[r for r in rows if r['sport']==sport and daily.in_window(r,NOW.isoformat()) and r.get('player_id') and r.get('odds') is None and r.get('sample',0)>=10 and .8<=r['probability']<=.9 and (r.get('hit_rate') or 0)>=.8 and not any(any(term in f.lower() for term in ('questionable','doubtful','day-to-day','outlier','role changed','minutes volatility','unresolved','starter unconfirmed','opportunity data missing')) for f in r.get('flags',[]))]
+  candidates=[r for r in rows if r['sport']==sport and daily.in_window(r,NOW.isoformat()) and r.get('player_id') and r.get('odds') is None and r.get('sample',0)>=(8 if sport in ('NFL','NCAAF') else 10) and .8<=r['probability']<=.9 and (r.get('hit_rate') or 0)>=.8 and not any(any(term in f.lower() for term in ('questionable','doubtful','day-to-day','outlier','role changed','minutes volatility','unresolved','starter unconfirmed','opportunity data missing')) for f in r.get('flags',[]))]
   used_games=set();used_players=set()
   for r in sorted(candidates,key=lambda r:(min(r['probability_floor'],r['hit_rate']),r.get('sample',0)),reverse=True):
    if r['event_id'] in used_games or r['player_id'] in used_players:continue
