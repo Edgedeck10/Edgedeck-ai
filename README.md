@@ -39,3 +39,5 @@ Cards include measured historical SVG game logs. The detail workspace supports l
 Theme: navy/Irish-green background with cream/gold workspaces and subtle shamrock accents. Native static SVG charts require no image API or paid service.
 
 Validation: 14 Python tests plus JavaScript tests of quote-sensitive value, risk buffering, price bands, unquoted edge, head-to-head filtering and chart sample integrity.
+
+Priced rankings require >=10 sampled games. Claimed edges above 15 pp are held for market-disagreement review rather than promoted as easy profit. Small-sample game-market models remain visible for inspection but cannot enter the provisional value shortlist.

@@ -147,6 +147,8 @@ def make_row(e,market,side,line,mu,sd,history,**extra):
  row['break_even']=round(implied(odds),5) if priced else None;row['edge_pp']=round((p-implied(odds))*100,2) if priced else None;row['expected_roi_pct']=round((p*dec(odds)-1)*100,2) if priced else None
  row['qualified']=bool(priced and n>=100 and row['sample']>=10 and row['edge_pp']>=3 and not row['flags'])
  row.update(an.value_metrics(p,odds,extra.get('probability_margin',.05)))
+ if priced and row['sample']<10:row['value_status']='Insufficient sample'
+ elif priced and (row['edge_pp'] or 0)>15:row['value_status']='Review market disagreement'
  row['research_score']=round(an.research_score(p,row['probability_margin'],odds,row['sample']),3)
  row['qualified']=bool(row['value_status']=='Provisional value' and n>=100 and row['sample']>=10 and not row['flags'])
  row['gradeable']=True
