@@ -9,14 +9,14 @@ def collect(games,cache,fetch,now):
    result[e['id']]={'status':'Indoor / no weather adjustment','indoor':True,'factor':1};continue
   if e['sport'] not in ('NFL','NCAAF','MLB','EPL','MLS') or not city:
    result[e['id']]={'status':'Venue / weather unavailable','factor':1};continue
-  key=city+','+v.get('state','');old=store.get(key,{})
+  key=city+','+(v.get('state') or '');old=store.get(key,{})
   try:
    if not old or (now-dt.datetime.fromisoformat(old['fetched_at'])).total_seconds()>3600:
     if key not in geo:
      data=fetch('https://geocoding-api.open-meteo.com/v1/search?'+urllib.parse.urlencode({'name':city,'count':10,'language':'en','format':'json'}))
      found=[r for r in data.get('results',[]) if r.get('country_code')==('GB' if e['sport']=='EPL' else 'US')]
      # Require a state match where supplied; no silent city-name guessing.
-     state=v.get('state','')
+     state=(v.get('state') or '')
      if state and len(state)>2:found=[r for r in found if r.get('admin1')==state]
      if len(found)!=1:
       result[e['id']]={'status':'Ambiguous venue location; weather not applied','factor':1};continue

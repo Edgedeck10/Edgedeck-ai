@@ -20,7 +20,7 @@ def eligible(r,day,now):
  return (r.get('conservative_edge_pp') or 0)>0 and 3<=(r.get('edge_pp') or 0)<=15 and (r.get('expected_roi_pct') or 0)>=5
 
 def freeze_leg(r):
- keys=['id','event_id','sport','market','side','line','selection','player_id','team_id','start','day','probability','raw_probability','probability_floor','odds','bookmaker','odds_updated','observed_at','edge_pp','conservative_edge_pp','expected_roi_pct','model_version','sample','price_kind','source_url']
+ keys=['id','event_id','sport','market','side','line','selection','event','player_id','team_id','start','day','probability','raw_probability','probability_floor','odds','bookmaker','odds_updated','observed_at','edge_pp','conservative_edge_pp','expected_roi_pct','model_version','sample','price_kind','source_url']
  return {k:r[k] for k in keys if k in r}|{'outcome':None}
 
 def update(records,rows,day,now,events,box,settle):

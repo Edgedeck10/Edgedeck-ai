@@ -40,6 +40,10 @@ class Daily(unittest.TestCase):
   rows=[dict(log_key='test',context={'audit':'same'},sample=20,side=s,line=l,flags=[]) for s,l in [('Over',15.5),('Under',20.5)]]
   report={'recommendations':copy.deepcopy(rows),'games':[]};store.normalize_report(report)
   self.assertEqual([{**report['model_details'][r['details_key']],**{k:v for k,v in r.items() if k!='details_key'}} for r in report['recommendations']],rows)
+ def test_null_venue_state_is_safe(self):
+  game={'id':'MLS:1','sport':'MLS','start':'2026-11-11T20:00:00Z','venue':{'city':'Columbus','state':None}}
+  result=weather.collect([game],{},lambda u:{},dt.datetime.fromisoformat(NOW))
+  self.assertEqual(result['MLS:1']['factor'],1)
  def test_role_and_weather_checks(self):
   pairs=[({'start':f'2026-11-{i+1:02}T00:00Z','stats':{'Minutes':20 if i<10 else 35}},10) for i in range(15)]
   self.assertIn('Role changed',a.sample_audit(pairs)['flags'])
