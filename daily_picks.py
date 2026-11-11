@@ -29,8 +29,14 @@ def eligible(r,day,now,parlay=False):
  except (ValueError,KeyError,TypeError):return False
  return (r.get('conservative_edge_pp') or 0)>0 and 3<=(r.get('edge_pp') or 0)<=15 and (r.get('expected_roi_pct') or 0)>=5
 
+def estimated_singles(rows,now):
+ # Rank confidence at model-fair prices near even money; no book offer or verified value inferred.
+ bad=('questionable','doubtful','out','minutes volatility','role changed','outlier-sensitive','starter unconfirmed','opportunity data missing','day-to-day','teammate usage unresolved')
+ pool=[r for r in rows if r.get('player_id') and r.get('odds') is None and in_window(r,now) and r.get('sample',0)>=(8 if r.get('sport') in ('NFL','NCAAF') else 10) and .55<=r.get('probability',0)<=2/3 and (r.get('hit_rate') or 0)>=.5 and not any(f.lower() in bad for f in r.get('flags',[]))]
+ return sorted(pool,key=lambda r:(min(r.get('probability_floor',0),r.get('hit_rate',0)),r.get('sample',0)),reverse=True)
+
 def freeze_leg(r):
- keys=['id','event_id','sport','market','side','line','selection','event','player_id','team_id','start','day','probability','raw_probability','probability_floor','odds','bookmaker','odds_updated','observed_at','edge_pp','conservative_edge_pp','expected_roi_pct','model_version','sample','price_kind','source_url','rationale','projection','sd','probability_margin','entry_price_limit','calibration_games','hit_rate','hit_rate_low','hit_rate_high','log_key','flags','fanduel_verified','book_state','quote_source_url','fanduel_selection_url','fanduel_market_id','fanduel_selection_id']
+ keys=['id','event_id','sport','market','side','line','selection','event','player_id','team_id','start','day','probability','raw_probability','probability_floor','odds','bookmaker','odds_updated','observed_at','edge_pp','conservative_edge_pp','expected_roi_pct','model_version','sample','price_kind','source_url','rationale','projection','sd','probability_margin','entry_price_limit','calibration_games','hit_rate','hit_rate_low','hit_rate_high','log_key','flags','fanduel_verified','book_state','quote_source_url','fanduel_selection_url','fanduel_market_id','fanduel_selection_id','fair_odds','estimated_price','estimated_price_method','expected_exposure','exposure_unit','rate']
  return {k:r[k] for k in keys if k in r}|{'outcome':None}
 
 def update(records,rows,day,now,events,box,settle):
@@ -94,7 +100,7 @@ def update_research(records,rows,day,now,events,box,settle,sizes=range(2,11),pol
   for n in sizes:
    if len(diverse)<n:continue
    if (day,sport,n) in seen:continue
-   legs=[{k:v for k,v in freeze_leg(r).items() if k!='rationale'} for r in diverse[:n]]
+   legs=[{k:v for k,v in freeze_leg(r).items() if k!='rationale' or n==1} for r in diverse[:n]]
    records.append({'id':f'{day}:{sport}:{n}:{policy}','policy_version':policy,'day':day,'sport':sport,'leg_count':n,'created_at':now,'legs':legs,'probability':math.prod(r['probability'] for r in legs),'buffered_probability':math.prod(r.get('probability_floor',r['probability']-.05) for r in legs),'result':None,'price_type':'Unquoted statistical thresholds; hypothetical outcome record only','profit_units':None})
   summary[sport]={}
   for n in sizes:

@@ -5,3 +5,5 @@ assert.equal(c.isFdLeg(r),true);assert.equal(c.isFdLeg({...r,bookmaker:'DraftKin
 assert.equal(c.fdSelectionUrl(r),r.fanduel_selection_url);assert.equal(c.fdSelectionUrl({...r,fanduel_selection_url:'https://sportsbook.fanduel.com.evil.test/addToBetslip?marketId=a&selectionId=b'}),null);assert.equal(c.fdSelectionUrl({...r,fanduel_selection_url:'https://sportsbook.fanduel.com/'}),null);
 c.report.recommendations=[{id:'ok',sport:'NBA',player_id:'1',sample:20,hit_rate:1,start:r.start},{id:'miss',sport:'NBA',player_id:'2',sample:20,hit_rate:.95,start:r.start},{id:'tiny',sport:'NBA',player_id:'3',sample:2,hit_rate:1,start:r.start}];assert.equal(c.perfectRows('NBA').length,1);assert.equal(c.perfectRows('NFL').length,0);
 console.log('PASS: FanDuel freshness/state gates, safe transfer links, exact historical sample screen');
+
+assert.equal(c.modelFair(.6),-150);assert.equal(c.modelFair(.8*.8),-178);assert.equal(c.modelFair(.4),150);assert.equal(c.modelFair(1),null);assert.equal(c.modelFair(null),null);console.log('PASS: model fair prices for singles and independent parlay probabilities');

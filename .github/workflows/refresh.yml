@@ -53,7 +53,7 @@ jobs:
         run: |
           mkdir -p _site/data
           cp index.html style.css app.js analysis-ui.js sports-ui.js picks-ui.js manifest.webmanifest icon.svg _site/
-          cp data/latest.json.gz data/feed_status.json data/history.json data/shortlist_history.json data/daily_history.json data/research_ticket_history.json data/perfect_ticket_history.json data/history_manifest.json _site/data/
+          cp data/latest.json.gz data/feed_status.json data/history.json data/shortlist_history.json data/daily_history.json data/research_ticket_history.json data/perfect_ticket_history.json data/estimated_best_history.json data/history_manifest.json _site/data/
           cp -r data/history_archive _site/data/
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3

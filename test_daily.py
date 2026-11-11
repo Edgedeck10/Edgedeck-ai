@@ -58,6 +58,16 @@ class Daily(unittest.TestCase):
   old=copy.deepcopy(ledger);d.update_research(ledger,list(reversed(rs)),DAY,NOW,{}, {},lambda *x:None,sizes=(5,7,9),policy='perfect-history-v1');self.assertEqual(ledger,old)
   _,summary=d.update_research(ledger,[],DAY,NOW,{f'NBA:{i}':{'final':True} for i in range(12)}, {},lambda r,e,b:0 if r['player_id']=='8' else 1,sizes=(5,7,9),policy='perfect-history-v1')
   self.assertEqual(summary['NBA']['5']['win_rate'],1);self.assertEqual(summary['NBA']['9']['win_rate'],0);self.assertTrue(all(t['profit_units'] is None for t in ledger))
+ def test_estimated_single_screen_and_frozen_evidence(self):
+  good=row()|{'odds':None,'player_id':'p','hit_rate':.7,'probability_floor':.60,'rationale':{'notes':['Original evidence']}}
+  self.assertEqual(d.estimated_singles([good],NOW),[good])
+  for change in [{'probability':.85},{'hit_rate':.4},{'flags':['Role changed']},{'sample':9},{'odds':-110}]:
+   self.assertEqual(d.estimated_singles([good|change],NOW),[])
+  ledger=[];ts,_=d.update_research(ledger,[good],DAY,NOW,{}, {},lambda *x:None,sizes=(1,),policy='estimated-best-v1')
+  self.assertEqual(ts[0]['legs'][0]['rationale'],good['rationale']);old=copy.deepcopy(ledger)
+  d.update_research(ledger,[good|{'line':99}],DAY,NOW,{}, {},lambda *x:None,sizes=(1,),policy='estimated-best-v1');self.assertEqual(ledger,old)
+  _,m=d.update_research(ledger,[],DAY,NOW,{good['event_id']:{'final':True}}, {},lambda *x:1,sizes=(1,),policy='estimated-best-v1')
+  self.assertEqual(m['NBA']['1']['win_rate'],1);self.assertIsNone(ledger[0]['profit_units'])
  def test_archive_lossless(self):
   rs=[{'id':str(i),'start':'2026-11-11T00:00Z','probability':.6,'outcome':None} for i in range(5010)]
   with tempfile.TemporaryDirectory() as tmp:
