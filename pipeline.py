@@ -9,7 +9,7 @@ ROOT=pathlib.Path(__file__).parent; DATA=ROOT/'data'; DATA.mkdir(exist_ok=True)
 NOW=dt.datetime.now(dt.timezone.utc); TODAY=NOW.astimezone(ZoneInfo('America/Indiana/Indianapolis')).date()
 SPORTS={'NBA':'basketball/nba','NFL':'football/nfl','NHL':'hockey/nhl','MLB':'baseball/mlb','NCAAF':'football/college-football','NCAAB':'basketball/mens-college-basketball','WNBA':'basketball/wnba','EPL':'soccer/eng.1','MLS':'soccer/usa.1'}
 DEFAULTS={'NBA':(112,15),'NCAAB':(74,12),'WNBA':(81,12),'NFL':(23,10),'NCAAF':(28,15),'MLB':(4.5,3),'NHL':(3,1.8),'EPL':(1.4,1.3),'MLS':(1.5,1.4)}
-MODEL='2.0.0'; ERRORS=[]; CAL_CACHE={}
+MODEL='2.0.1'; ERRORS=[]; CAL_CACHE={}
 def read(n,d):
  try:return json.loads((DATA/n).read_text())
  except (ValueError,OSError):return d
@@ -129,6 +129,7 @@ def make_row(e,market,side,line,mu,sd,history,**extra):
  else:
   # Half-point lines and count thresholds. Continuity correction for whole-number >= lines encoded as n-.5.
   raw=1-cdf(line,mu,sd) if side=='Over' else cdf(line,mu,sd)
+ raw=extra.pop('raw_override',raw)
  raw=clip(raw,.025,.975);key=e['sport']+':'+market+':'+side
  p,n=calibrate(history,key,raw);odds=extra.get('odds');priced=odds is not None and abs(odds)>=100
  identifier='|'.join(str(x) for x in (MODEL,e['id'],extra.get('player_id','team'),market,extra.get('selection',''),side,line))
@@ -163,10 +164,17 @@ def team_rows(events,e,history):
  for side in ('home','away'):
   t=e[side];mu=m if side=='home' else -m;ctx=hf if side=='home' else af
   common={'team_id':t['id'],'selection':t['name'],'sample':sample,'context':ctx,'reasoning':f"Scoring form + opponent points allowed; {sample} paired team games available. Rest adjustment for basketball. No position-specific defensive model.",'flags':['Small sample'] if sample<10 else []}
-  q=prices.get(('Moneyline',side),{});rows.append(make_row(e,'Moneyline',side,None,m,sd,history,**common,**{k:v for k,v in q.items() if k!='line'}))
+  if e['sport'] in ('EPL','MLS'):
+   masses=lambda mu:[math.exp(-mu)*mu**k/math.factorial(k) for k in range(16)]
+   ph,pa=masses(max(.05,h)),masses(max(.05,a));win=sum(ph[i]*pa[j] for i in range(16) for j in range(16) if (i>j if side=='home' else j>i));common_ml={**common,'raw_override':win}
+  else:common_ml=common
+  q=prices.get(('Moneyline',side),{});rows.append(make_row(e,'Moneyline',side,None,m,sd,history,**common_ml,**{k:v for k,v in q.items() if k!='line'}))
   q=prices.get(('Spread',side));line=q['line'] if q and q['line'] is not None else round(-mu*2)/2+.5
   rows.append(make_row(e,'Spread',side,line,mu,sd,history,**common,**({k:v for k,v in q.items() if k!='line'} if q else {})))
   rows.append(make_row(e,'Team total','Over',max(.5,math.floor((h if side=='home' else a))-.5),h if side=='home' else a,ctx['sd'],history,**common))
+ if e['sport'] in ('EPL','MLS'):
+  draw=sum(math.exp(-h-a)*(h*a)**k/(math.factorial(k)**2) for k in range(16))
+  rows.append(make_row(e,'Moneyline','draw',None,m,sd,history,selection='Draw',sample=sample,raw_override=draw,flags=['Unvalidated Poisson model']))
  for side in ('Over','Under'):
   q=prices.get(('Total',side.lower()));line=q['line'] if q and q['line'] is not None else math.floor(h+a)+.5
   rows.append(make_row(e,'Total',side,line,h+a,sd,history,selection=e['event'],sample=sample,context={'home':hf,'away':af},flags=['Small sample'] if sample<10 else [],**({k:v for k,v in q.items() if k!='line'} if q else {})))
@@ -249,6 +257,9 @@ def settle(r,e,box):
   if not found:return None
   actual=expanded(found['stats']).get(market)
  elif market=='Moneyline':
+  if e['sport'] in ('EPL','MLS'):
+   if side=='draw':return int(e['home']['score']==e['away']['score'])
+   return int(e[side]['score']>e['away' if side=='home' else 'home']['score'])
   if e['home']['score']==e['away']['score']:return 'push'
   if side not in ('home','away'):side='home' if r.get('selection')==e['home']['name'] else 'away'
   return int(e[side]['score']>e['away' if side=='home' else 'home']['score'])
@@ -337,7 +348,7 @@ def main():
  for e in future:
   rows+=team_rows(events,e,history);rows+=player_rows(events,e,box,injuries,history)
  # Freeze a separate recommended portfolio, one first selection per game.
- candidates=[r for r in rows if r.get('player_id') and r['market'] in ('Points','Rebounds','Assists','PRA','Points + rebounds','Points + assists','Rebounds + assists','Passing yards','Rushing yards','Receiving yards','Receptions','Shots on goal') and r['side']=='Over' and r['sample']>=5 and r['probability']>=.65 and not any(x.lower() in ('questionable','doubtful','out') for x in r['flags'])]
+ candidates=[r for r in rows if r.get('player_id') and r['market'] in ('Points','Rebounds','Assists','PRA','Points + rebounds','Points + assists','Rebounds + assists','Passing yards','Rushing yards','Receiving yards','Receptions','Shots on goal') and r['side']=='Over' and r['sample']>=5 and .75<=r['probability']<=.94 and r['line']>={'Points':9.5,'Rebounds':2.5,'Assists':1.5,'PRA':14.5,'Points + rebounds':9.5,'Points + assists':9.5,'Rebounds + assists':3.5}.get(r['market'],.5) and not any(x.lower() in ('questionable','doubtful','out') for x in r['flags'])]
  candidates.sort(key=lambda r:(r['probability']+min(r['sample'],20)*.005),reverse=True)
  portfolio_seen={r['event_id'] for r in shortlist if r.get('model_version')==MODEL};featured=[];featured_games=set()
  for r in candidates:

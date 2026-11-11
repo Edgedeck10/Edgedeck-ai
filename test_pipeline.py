@@ -25,5 +25,9 @@ class PipelineTest(unittest.TestCase):
  def test_calibration(self):
   h={'event_id':'NBA:old','model_version':p.MODEL,'calibration_key':'NBA:Points:Over','market':'Points','side':'Over','outcome':1,'raw_probability':.6}
   result,n=p.calibrate([h],h['calibration_key'],.6);self.assertGreater(result,.6);self.assertEqual(n,1)
+ def test_soccer_draw_is_a_separate_outcome(self):
+  e={**self.e,'sport':'EPL'};e['home']={**e['home'],'score':1};e['away']={**e['away'],'score':1}
+  self.assertEqual(p.settle({'market':'Moneyline','side':'draw'},e,{}),1)
+  self.assertEqual(p.settle({'market':'Moneyline','side':'home'},e,{}),0)
  def test_schedule_score_objects(self):self.assertEqual(p.num({'value':117}),117)
 if __name__=='__main__':unittest.main()
