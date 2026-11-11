@@ -47,7 +47,7 @@ def in_selection_day(r,days):
 def estimated_singles(rows,now):
  # Rank confidence at model-fair prices near even money; no book offer or verified value inferred.
  bad=('questionable','doubtful','out','minutes volatility','role changed','outlier-sensitive','starter unconfirmed','opportunity data missing','day-to-day','teammate usage unresolved')
- pool=[r for r in rows if r.get('player_id') and r.get('odds') is None and r.get('side')=='Over' and in_window(r,now) and r.get('sample',0)>=(8 if r.get('sport') in ('NFL','NCAAF') else 10) and .45<=r.get('probability',0)<=11/21 and (r.get('hit_rate') or 0)>=.45 and not any(f.lower() in bad for f in r.get('flags',[]))]
+ pool=[r for r in rows if r.get('player_id') and r.get('odds') is None and r.get('side')=='Over' and in_window(r,now) and r.get('sample',0)>=(8 if r.get('sport') in ('NFL','NCAAF') else 10) and .60<=r.get('probability',0)<=.97 and (r.get('hit_rate') or 0)>=.45 and not any(f.lower() in bad for f in r.get('flags',[]))]
  return sorted(pool,key=lambda r:(min(r.get('probability_floor',0),r.get('hit_rate',0)),r.get('sample',0)),reverse=True)
 
 def freeze_leg(r):

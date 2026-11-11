@@ -333,7 +333,7 @@ def main():
   future+=sorted([e for e in events.values() if e['sport']==sport and not e.get('final') and e.get('state')=='pre' and NOW<iso(e['start'])<NOW+dt.timedelta(days=7)],key=lambda e:e['start'])[:40]
  future.sort(key=lambda e:e['start'])
  extra_events=extra_fixtures.collect(fetch,parallel,NOW,ERRORS)
- if cache.get('schedule_window_version')!=120:cache['schedules']={};cache['schedule_window_version']=120
+ if cache.get('schedule_window_version')!=365:cache['schedules']={};cache['schedule_window_version']=365
  # Cache past team schedules daily; bootstrap real season-window samples.
  teams={(e['sport'],e[s]['id']) for e in future for s in ('home','away') if e['sport'] not in ('EPL','MLS')}
  jobs=[]
@@ -344,7 +344,7 @@ def main():
   sport=key.split(':')[0]
   for raw in d.get('events',[]):
    e=event(raw,sport)
-   if e and e['final'] and NOW-dt.timedelta(days=120)<iso(e['start'])<NOW:events[e['id']]=e
+   if e and e['final'] and NOW-dt.timedelta(days=365)<iso(e['start'])<NOW:events[e['id']]=e
   cache['schedules'][key]=TODAY.isoformat()
  write('cache.json',cache);write('events.json',events)
  # Current rosters prevent stale traded-player membership. Daily cache; report missing roster explicitly.
@@ -437,12 +437,12 @@ def main():
  for r in best_targets:
   if r['sport'] in best_sports:continue
   r['rationale']=pick_evidence.build(r,events,injuries,PLAYER_LOGS,scores);best_rows.append(r);best_sports.add(r['sport'])
- estimated_current,estimated_summary=daily.update_research(estimated_ledger,best_rows,TODAY.isoformat(),NOW.isoformat(),events,box,settle,sizes=(1,),policy='estimated-best-minus110-v5',over_only=True,min_decimal=21/11)
+ estimated_current,estimated_summary=daily.update_research(estimated_ledger,best_rows,TODAY.isoformat(),NOW.isoformat(),events,box,settle,sizes=(1,),policy='estimated-best-confidence-v6',over_only=True,min_decimal=1)
  estimated_current=copy.deepcopy(estimated_current)
  for ticket in estimated_current:ticket['current_review']=news_feed.review(ticket,rows,events,injuries,news,NOW.isoformat())
- perfect_current,perfect_summary=daily.update_research(perfect_ledger,perfect_safe,TODAY.isoformat(),NOW.isoformat(),events,box,settle,sizes=(5,7,9),policy='perfect-history-minus110-v5',over_only=True,min_decimal=21/11)
- daily_current,daily_summary,daily_availability=daily.update(daily_ledger,slate_rows,TODAY.isoformat(),NOW.isoformat(),events,box,settle,min_decimal=21/11)
- research_current,research_summary=daily.update_research(research_ledger,research,TODAY.isoformat(),NOW.isoformat(),events,box,settle,policy='research-minus110-v5',over_only=True,min_decimal=21/11)
+ perfect_current,perfect_summary=daily.update_research(perfect_ledger,perfect_safe,TODAY.isoformat(),NOW.isoformat(),events,box,settle,sizes=(5,7,9),policy='perfect-history-confidence-v6',over_only=True,min_decimal=1)
+ daily_current,daily_summary,daily_availability=daily.update(daily_ledger,slate_rows,TODAY.isoformat(),NOW.isoformat(),events,box,settle,min_decimal=1)
+ research_current,research_summary=daily.update_research(research_ledger,research,TODAY.isoformat(),NOW.isoformat(),events,box,settle,policy='research-confidence-v6',over_only=True,min_decimal=1)
  research_current=copy.deepcopy(research_current)
  for ticket in research_current:ticket['current_review']=news_feed.review(ticket,rows,events,injuries,news,NOW.isoformat())
  perfect_current=copy.deepcopy(perfect_current)
