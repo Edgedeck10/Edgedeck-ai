@@ -75,6 +75,10 @@ class Daily(unittest.TestCase):
   self.assertEqual(ledger[0],frozen);self.assertEqual(len(current),1);self.assertEqual(current[0]['legs'][0]['side'],'Over')
   d.update_research(ledger,[],DAY,NOW,{under['event_id']:{'final':True}}, {},lambda *x:0,sizes=(1,),policy='overs-v2',over_only=True)
   self.assertEqual(ledger[0]['result'],'loss')
+ def test_daily_slate_and_sunday_release(self):
+  rs=[row()|{'sport':'NBA'},row(1)|{'sport':'NBA','start':'2026-11-12T20:00:00Z'},row(2)|{'sport':'NFL','start':'2026-11-12T20:00:00Z'},row(3)|{'sport':'NFL','start':'2026-11-15T20:00:00Z'}]
+  days=d.selection_days(rs,NOW);self.assertEqual(days['NBA'],DAY);self.assertEqual(days['NFL'],'2026-11-12');self.assertFalse(d.in_selection_day(rs[1],days))
+  sunday=[rs[-1]];self.assertIsNone(d.selection_days(sunday,'2026-11-13T12:00:00Z')['NFL']);self.assertEqual(d.selection_days(sunday,'2026-11-14T12:00:00Z')['NFL'],'2026-11-15')
  def test_archive_lossless(self):
   rs=[{'id':str(i),'start':'2026-11-11T00:00Z','probability':.6,'outcome':None} for i in range(5010)]
   with tempfile.TemporaryDirectory() as tmp:

@@ -1,6 +1,7 @@
 """Immutable daily model-selection ledger. Singles and each parlay size graded separately."""
 import math,datetime as dt
 from collections import defaultdict
+from zoneinfo import ZoneInfo
 POLICY='daily-v4-fanduel-only';SPORTS=['NBA','NFL','NHL','MLB','NCAAB','NCAAF','WNBA','EPL','MLS','PGA','ATP','WTA','UFC']
 def timestamp(s):return dt.datetime.fromisoformat(s.replace('Z','+00:00'))
 def decimal(o):return 1+100/abs(o) if o<0 else 1+o/100
@@ -28,6 +29,20 @@ def eligible(r,day,now,parlay=False):
   if not dt.timedelta(0)<=timestamp(now)-timestamp(r.get('odds_updated') or r['observed_at'])<=dt.timedelta(minutes=35):return False
  except (ValueError,KeyError,TypeError):return False
  return (r.get('conservative_edge_pp') or 0)>0 and 3<=(r.get('edge_pp') or 0)<=15 and (r.get('expected_roi_pct') or 0)>=5
+
+def selection_days(rows,now):
+ local=timestamp(now).astimezone(ZoneInfo('America/Indiana/Indianapolis'));today=local.date();result={}
+ for sport in SPORTS:
+  days=sorted({timestamp(r['start']).astimezone(ZoneInfo('America/Indiana/Indianapolis')).date() for r in rows if r.get('sport')==sport and in_window(r,now)})
+  target=today if today in days else days[0] if days and sport in ('NFL','NCAAF') else None
+  # Sunday NFL picks open Saturday; never skip a held Sunday slate to recommend Monday instead.
+  if target and sport=='NFL' and target.weekday()==6 and local.date()<target-dt.timedelta(days=1):target=None
+  result[sport]=target.isoformat() if target else None
+ return result
+
+def in_selection_day(r,days):
+ try:return timestamp(r['start']).astimezone(ZoneInfo('America/Indiana/Indianapolis')).date().isoformat()==days.get(r['sport'])
+ except (KeyError,ValueError,TypeError):return False
 
 def estimated_singles(rows,now):
  # Rank confidence at model-fair prices near even money; no book offer or verified value inferred.
