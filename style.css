@@ -38,3 +38,6 @@ body[data-view="allpicks"] .discover-nav{display:none}
 @media(max-width:600px){.discover-nav button{font-size:12px;padding:11px 8px}.ticket-tool-row button{font-size:11px}.daily-hero.compact-ticket h3{font-size:22px}.compact-ticket .proof-numbers b{font-size:20px}.compact-ticket .small{font-size:11px}.ticket-strip>.daily-ticket{flex-basis:88%}}
 
 .model-audit{margin:14px 0;padding:12px;background:#eef5f0;border:1px solid #ceddd2;border-radius:10px;font-size:12px;color:#163b2b}.model-audit summary{font-weight:750;cursor:pointer}.model-audit input{display:block;width:100%;margin:8px 0;padding:10px;border:1px solid #acbdaf;border-radius:8px;background:#fff;color:#0c2340}.audit-result{padding:10px;background:white;border-radius:8px}.model-audit p{line-height:1.55}
+
+/* Remove decorative clover watermarks from all content surfaces. */
+body::before,.hero::after,.hero aside::after,.pick::before,.daily-hero::after{content:none!important;display:none!important}
