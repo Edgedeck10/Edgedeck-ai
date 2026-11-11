@@ -332,6 +332,7 @@ def main():
   future+=sorted([e for e in events.values() if e['sport']==sport and not e.get('final') and e.get('state')=='pre' and NOW<iso(e['start'])<NOW+dt.timedelta(days=7)],key=lambda e:e['start'])[:40]
  future.sort(key=lambda e:e['start'])
  extra_events=extra_fixtures.collect(fetch,parallel,NOW)
+ if cache.get('schedule_window_version')!=120:cache['schedules']={};cache['schedule_window_version']=120
  # Cache past team schedules daily; bootstrap real season-window samples.
  teams={(e['sport'],e[s]['id']) for e in future for s in ('home','away') if e['sport'] not in ('EPL','MLS')}
  jobs=[]
