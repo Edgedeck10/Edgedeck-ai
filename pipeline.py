@@ -8,12 +8,13 @@ from collections import defaultdict
 from zoneinfo import ZoneInfo
 import actuarial
 import matchup
+import ai_record
 ROOT=pathlib.Path(__file__).parent; DATA=ROOT/'data'/'classic'; DATA.mkdir(parents=True,exist_ok=True)
 NOW=dt.datetime.now(dt.timezone.utc); TODAY=NOW.astimezone(ZoneInfo('America/Indiana/Indianapolis')).date()
 SPORTS={'NBA':'basketball/nba','NFL':'football/nfl','NHL':'hockey/nhl','MLB':'baseball/mlb','NCAAF':'football/college-football','NCAAB':'basketball/mens-college-basketball','WNBA':'basketball/wnba','EPL':'soccer/eng.1','MLS':'soccer/usa.1'}
 DEFAULTS={'NBA':(112,15),'NCAAB':(74,12),'WNBA':(81,12),'NFL':(23,10),'NCAAF':(28,15),'MLB':(4.5,3),'NHL':(3,1.8),'EPL':(1.4,1.3),'MLS':(1.5,1.4)}
 MODEL='opportunity-4.2.0'; ERRORS=[]; CAL_CACHE={}; PLAYER_LOGS={}
-COMPRESSED={'latest.json','history.json','cache.json'}
+COMPRESSED={'latest.json','history.json','cache.json','ai_picks.json'}
 def read(n,d):
  packed=DATA/(n+'.gz')
  if packed.exists():
@@ -291,6 +292,17 @@ def player_rows(events,e,box,injuries,history):
      rows.append(r)
  return rows
 
+def actual_value(r,e,box):
+ market=r.get('market');side=r.get('side')
+ if r.get('player_id'):
+  found=next((x for x in box.get(e['id'],[]) if x['player_id']==r['player_id']),None)
+  return expanded(found['stats']).get(market) if found else None
+ if market=='Total':return e['home']['score']+e['away']['score']
+ if market=='Team total':return e['home' if r.get('team_id')==e['home']['id'] else 'away']['score']
+ if market=='Spread':return e[side]['score']-e['away' if side=='home' else 'home']['score']
+ if market=='Moneyline':return e['home']['score']-e['away']['score']
+ return None
+
 def settle(r,e,box):
  if not e.get('final'):return None
  market=r.get('market','Moneyline');line=r.get('line');side=r.get('side');actual=None
@@ -315,7 +327,7 @@ def settle(r,e,box):
  return int(actual>line) if side=='Over' else int(actual<line)
 
 def main():
- events=read('events.json',{});history=read('history.json',[]);cache=read('cache.json',{'box':{},'schedules':{},'rosters':{}});box=cache['box'];cache.setdefault('box_schema',{})
+ events=read('events.json',{});history=read('history.json',[]);ai_ledger=read('ai_picks.json',[]);cache=read('cache.json',{'box':{},'schedules':{},'rosters':{}});box=cache['box'];cache.setdefault('box_schema',{})
  # Normalize legacy records; keep existing immutable forecast probabilities.
  for e in events.values():
   e.setdefault('espn_id',e['id'].split(':')[-1]);e.setdefault('state','post' if e.get('final') else 'pre');e.setdefault('source_url','https://www.espn.com');e.setdefault('odds',[])
@@ -377,18 +389,33 @@ def main():
   e=events[key];injuries+=injury_rows(d,e)
   if not e.get('odds'):e['odds']=d.get('pickcenter',[])
  write('cache.json',cache);write('events.json',events)
- for r in history:
+ for r in history+ai_ledger:
   if r.get('outcome') is not None:continue
   e=events.get(r['event_id'])
   if not e:continue
   result=settle(r,e,box)
   if result is not None:
-   r['outcome']=result;r['graded_at']=NOW.isoformat();r['profit_units']=0 if result=='push' else round(dec(r['odds'])-1 if result else -1,4) if r.get('odds') else None
+   r['outcome']=result;r['actual_value']=actual_value(r,e,box);r['graded_at']=NOW.isoformat();r['profit_units']=0 if result=='push' else round(dec(r['odds'])-1 if result else -1,4) if r.get('odds') else None
  rows=[]
  # Old hockey parser could confuse shootout SOG with regulation shots; do not model those boxes.
  prediction_box={k:v for k,v in box.items() if not v or v[0]['sport']!='NHL' or cache['box_schema'].get(k)==4}
  for e in future:
   rows+=team_rows(events,e,history);rows+=player_rows(events,e,prediction_box,injuries,history)
+ learning=ai_record.calibration(ai_ledger,NOW.isoformat())
+ for row in rows:ai_record.apply(row,learning)
+ frozen_events={r['event_id'] for r in ai_ledger}
+ for event in future:
+  if event['id'] in frozen_events:continue
+  chosen=ai_record.choose([r for r in rows if r['event_id']==event['id']])
+  for rank,r in enumerate(chosen,1):
+   snapshot={k:v for k,v in r.items() if k not in ('context','recent_values')}
+   if r.get('log_key') in PLAYER_LOGS:snapshot['frozen_model']=PLAYER_LOGS[r['log_key']].get('model')
+   snapshot.update({'ai_rank':rank,'ai_selected_at':NOW.isoformat(),'outcome':None,'selection_policy':'game-top-five-v1'})
+   ai_ledger.append(snapshot)
+ active_ids={e['id'] for e in future}
+ ai_selections={eid:[r for r in ai_ledger if r['event_id']==eid] for eid in active_ids}
+ ai_summary=ai_record.summarize(ai_ledger)
+ write('ai_picks.json',ai_ledger)
  # Record one pregame forecast for each exact suggested line; never mutate it when refreshing.
  seen={r['id'] for r in history}
  for r in rows:
@@ -402,10 +429,11 @@ def main():
  bins=[]
  for lo in (0,.5,.6,.7,.8,.9):
   hi=.5 if lo==0 else lo+.1;rs=[r for r in settled if lo<=r['probability']<hi];bins.append({'from':lo,'to':round(hi,2),'n':len(rs),'predicted':mean([r['probability'] for r in rs],None),'actual':mean([r['outcome'] for r in rs],None)})
- report={'engine_monitoring':actuarial.monitoring(history,MODEL),'engine_status':{'version':actuarial.VERSION,'full_hierarchical_bayes':False,'full_game_simulation':False,'portfolio_optimizer':'Disabled: forecasts and joint returns not validated','coverage':'Player props with sufficient box-score data; game markets retain legacy scoring model; golf has no automatic model','method_reference':'https://mc-stan.org/docs/stan-users-guide/sampling-from-the-posterior-predictive-distribution.html'},'player_logs':PLAYER_LOGS,'version':MODEL,'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'refresh_minutes':15,'recommendations':rows,'games':future,'injuries':injuries,'metrics':{'tracked_predictions':len(history),'settled_predictions':len(settled),'won':sum(r['outcome'] for r in settled),'brier_score':round(brier,4) if brier is not None else None,'independent_groups':len(groups),'priced_settled':len(priced),'realized_roi_pct':round(100*sum(r['profit_units'] for r in priced)/len(priced),2) if priced else None},'calibration_bins':bins,'coverage':list(SPORTS),'source':'ESPN public scoreboards / boxscores / injury reports; DraftKings game odds where supplied by ESPN','errors':ERRORS,'backfill_remaining':max(0,len(needed)-len(target)),'limitations':['Player-prop prices are not provided by the free game feed. Suggested lines are model thresholds, not sportsbook offers.','Player props use deterministic opportunity/workload scenario models; game markets retain the legacy normal model. Probabilities are not validated.','Injury status and teammate absences are flags; confirmed rotations, player usage redistribution and position-specific defense are not modeled.','No automatic golf prediction or odds feed; exact markets can be imported locally.','Missing player participation remains pending for review, never automatically graded as a loss.']}
+ report={'ai_selections':ai_selections,'ai_record':ai_summary,'ai_learning':learning,'ai_recent_results':[{k:r.get(k) for k in ('event','sport','selection','market','side','line','probability','projection','actual_value','outcome','ai_selected_at','graded_at','flags')} for r in ai_ledger if r.get('outcome') is not None][-200:],'engine_monitoring':actuarial.monitoring(history,MODEL),'engine_status':{'version':actuarial.VERSION,'full_hierarchical_bayes':False,'full_game_simulation':False,'portfolio_optimizer':'Disabled: forecasts and joint returns not validated','coverage':'Player props with sufficient box-score data; game markets retain legacy scoring model; golf has no automatic model','method_reference':'https://mc-stan.org/docs/stan-users-guide/sampling-from-the-posterior-predictive-distribution.html'},'player_logs':PLAYER_LOGS,'version':MODEL,'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'refresh_minutes':15,'recommendations':rows,'games':future,'injuries':injuries,'metrics':{'tracked_predictions':len(history),'settled_predictions':len(settled),'won':sum(r['outcome'] for r in settled),'brier_score':round(brier,4) if brier is not None else None,'independent_groups':len(groups),'priced_settled':len(priced),'realized_roi_pct':round(100*sum(r['profit_units'] for r in priced)/len(priced),2) if priced else None},'calibration_bins':bins,'coverage':list(SPORTS),'source':'ESPN public scoreboards / boxscores / injury reports; DraftKings game odds where supplied by ESPN','errors':ERRORS,'backfill_remaining':max(0,len(needed)-len(target)),'limitations':['Player-prop prices are not provided by the free game feed. Suggested lines are model thresholds, not sportsbook offers.','Player props use deterministic opportunity/workload scenario models; game markets retain the legacy normal model. Probabilities are not validated.','Injury status and teammate absences are flags; confirmed rotations, player usage redistribution and position-specific defense are not modeled.','No automatic golf prediction or odds feed; exact markets can be imported locally.','Missing player participation remains pending for review, never automatically graded as a loss.']}
  # No destructive retention of forecast history. Cache excludes bulky raw feed payloads.
  write('events.json',events);write('history.json',history);write('latest.json',report);write('cache.json',cache)
  print(f'{len(future)} upcoming games | {len(rows)} lines | {sum(bool(r.get("player_id")) for r in rows)} player lines | {len(settled)} settled | {len(ERRORS)} feed errors')
 if __name__=='__main__':main()
+
 
 

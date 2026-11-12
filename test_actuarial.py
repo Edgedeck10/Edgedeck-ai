@@ -121,3 +121,29 @@ class ProjectionEvidenceTests(unittest.TestCase):
   self.assertAlmostEqual(x['total'],45)
   self.assertAlmostEqual(r['projection'],x['total'],places=2)
   self.assertEqual(x['home']['source_games'][0]['event_id'],g['id'])
+
+
+class AiRecordTests(unittest.TestCase):
+ def row(self,**kw):
+  return {'id':'x','event_id':'e','event':'A at B','sport':'NFL','market':'Total','side':'Over','line':40.5,'projection':45,'probability':.8,'model_version':'opportunity-4.2.0','start':'2026-01-01','graded_at':'2026-01-02','sample':10,'fair_odds':-150,**kw}
+ def test_records_exclude_push_pending_and_separate_sports(self):
+  import ai_record as a
+  rows=[self.row(outcome=1,odds=100,profit_units=1,actual_value=48),self.row(id='y',outcome=0,odds=100,profit_units=-1,actual_value=35),self.row(id='p',outcome='push'),self.row(id='z',sport='NBA',outcome=None)]
+  d=a.summarize(rows);overall=d['records'][0];nfl=next(r for r in d['records'] if r['sport']=='Pro Football')
+  self.assertEqual((overall['wins'],overall['losses'],overall['pushes'],overall['pending']),(1,1,1,1));self.assertEqual(overall['hit_rate'],.5);self.assertEqual(nfl['roi_pct'],0)
+ def test_bundle_loss_overrides_pending(self):
+  import ai_record as a
+  self.assertEqual(a.summarize([self.row(outcome=0),self.row(id='y',outcome=None)])['bundles'][0]['outcome'],0)
+ def test_calibration_excludes_future_and_is_holdout_gated(self):
+  import ai_record as a
+  rows=[self.row(id=str(i),event_id=str(i),start=f'2026-01-{i%28+1:02d}',graded_at='2026-02-01',outcome=i%2) for i in range(40)]
+  self.assertEqual(a.calibration(rows,'2026-01-01'),{})
+  rule=a.calibration(rows,'2026-03-01')['NFL|Total'];self.assertLess(rule['conditional_probability_offset'],0);self.assertLess(rule['adjusted_brier'],rule['baseline_brier'])
+  original=rows[0]['probability'];future=self.row();a.apply(future,{'NFL|Total':rule});self.assertLess(future['probability'],original);self.assertEqual(rows[0]['probability'],original)
+ def test_insufficient_learning_does_not_change_forecast(self):
+  import ai_record as a
+  row=self.row();a.apply(row,a.calibration([self.row(outcome=0)],'2026-03-01'));self.assertEqual(row['probability'],.8)
+ def test_selection_one_player_and_main_lines(self):
+  import ai_record as a
+  rows=[self.row(id='alt',player_id='p',base_line=50.5),self.row(id='base',player_id='p',base_line=40.5),self.row(id='base2',player_id='p',base_line=40.5)]
+  self.assertEqual(len(a.choose(rows)),1)

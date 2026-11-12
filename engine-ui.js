@@ -1,9 +1,9 @@
 /* Opportunity evidence and approximate empirical-dependence parlay research. */
-function engineFor(r){return report.player_logs?.[r.log_key]?.model||null}
+function engineFor(r){return r.frozen_model||report.player_logs?.[r.log_key]?.model||null}
 function enginePrice(r,line=r.line,side=r.side,odds=r.odds){
  const model=engineFor(r);if(!model)return null;
  const ps=[],pushes=[],evs=[];
- for(const h of model.draw_histograms){let total=0,w=0,u=0;for(const [y,n] of Object.entries(h)){total+=n;if(Number(y)===line)u+=n;else if(side==='Under'?Number(y)<line:Number(y)>line)w+=n}ps.push(w/total);pushes.push(u/total);if(odds!=null)evs.push(w/total*(decimal(odds)-1)-(1-w/total-u/total))}
+ for(const h of model.draw_histograms){let total=0,w=0,u=0;for(const [y,n] of Object.entries(h)){total+=n;if(Number(y)===line)u+=n;else if(side==='Under'?Number(y)<line:Number(y)>line)w+=n}const p=Math.max(0,Math.min(1-u/total,w/total+(line===r.line&&side===r.side?(r.learning_offset||0):0)));ps.push(p);pushes.push(u/total);if(odds!=null)evs.push(p*(decimal(odds)-1)-(1-p-u/total))}
  const avg=a=>a.reduce((x,y,i)=>x+y*(model.scenario_weights?.[i]??1/a.length),0),q=(a,p)=>{a=[...a].sort((x,y)=>x-y);return a[Math.floor((a.length-1)*p)]},p=avg(ps),push=avg(pushes),conditional=Math.max(.0001,Math.min(.9999,p/(1-push)||.5));
  return {probability:p,push_probability:push,fair_odds:fair(conditional),probability_range_80:[Math.min(...ps),Math.max(...ps)],expected_roi_pct:evs.length?100*avg(evs):null,ev_lower_80_pct:evs.length?100*Math.min(...evs):null,probability_positive_ev:null};
 }
@@ -39,3 +39,4 @@ function projectionPanel(r){
  let comparison='';if(r.line!=null&&r.market!=='Spread')comparison=`<p><b>Projection ${n(r.projection)} versus ${r.odds==null?'model reference':'observed sportsbook'} line ${n(r.line)}: ${n(r.projection-r.line)} difference</b>. Direction: ${esc(r.side)}.</p>`;
  return `<details class="view-guide"><summary>How this projection was calculated</summary>${comparison}${body}<p><b>Price check:</b> ${r.odds==null?'No actual sportsbook quote is attached; this projection difference alone does not establish value.':`${odd(r.odds)} requires ${pct(implied(r.odds))} wins without pushes. Model win estimate ${pct(r.probability)}, push ${pct(r.push_probability||0)}, estimated return ${fmt(r.expected_roi_pct)}%.`}</p><p class="small">The win probability uses the outcome distribution, not the projection difference alone. ${r.player_id?'Unmodeled factors are listed in the opportunity evidence panel.':'Game probabilities use the legacy normal-margin/total approximation and any recorded calibration adjustment.'}</p></details>`;
 }
+
