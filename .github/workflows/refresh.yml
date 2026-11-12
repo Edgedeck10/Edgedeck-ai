@@ -45,7 +45,7 @@ jobs:
         run: |
           mkdir -p _site/data/classic
           cp index.html style.css app.js engine-ui.js manifest.webmanifest icon.svg _site/
-          cp data/classic/latest.json data/classic/history.json _site/data/classic/
+          cp data/classic/latest.json.gz data/classic/history.json.gz _site/data/classic/
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:

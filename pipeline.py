@@ -1,6 +1,7 @@
 """EdgeDeck v2: public scores, market snapshots, pregame team and player models.
 Standard library only. No paid endpoints, keys, or automated betting.
 """
+import gzip
 import json, math, pathlib, datetime as dt, urllib.request, statistics as st, re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import defaultdict
@@ -11,11 +12,22 @@ NOW=dt.datetime.now(dt.timezone.utc); TODAY=NOW.astimezone(ZoneInfo('America/Ind
 SPORTS={'NBA':'basketball/nba','NFL':'football/nfl','NHL':'hockey/nhl','MLB':'baseball/mlb','NCAAF':'football/college-football','NCAAB':'basketball/mens-college-basketball','WNBA':'basketball/wnba','EPL':'soccer/eng.1','MLS':'soccer/usa.1'}
 DEFAULTS={'NBA':(112,15),'NCAAB':(74,12),'WNBA':(81,12),'NFL':(23,10),'NCAAF':(28,15),'MLB':(4.5,3),'NHL':(3,1.8),'EPL':(1.4,1.3),'MLS':(1.5,1.4)}
 MODEL='opportunity-3.0.0'; ERRORS=[]; CAL_CACHE={}; PLAYER_LOGS={}
+COMPRESSED={'latest.json','history.json','cache.json'}
 def read(n,d):
+ packed=DATA/(n+'.gz')
+ if packed.exists():
+  # Corrupt archives must fail the run rather than silently erase history.
+  return json.loads(gzip.decompress(packed.read_bytes()))
  try:return json.loads((DATA/n).read_text())
- except (ValueError,OSError):return d
+ except FileNotFoundError:return d
 
-def write(n,v): (DATA/n).write_text(json.dumps(v,ensure_ascii=False,separators=(',',':'),allow_nan=False))
+def write(n,v):
+ payload=json.dumps(v,ensure_ascii=False,separators=(',',':'),allow_nan=False).encode()
+ target=DATA/(n+'.gz' if n in COMPRESSED else n)
+ temporary=target.with_name(target.name+'.tmp')
+ temporary.write_bytes(gzip.compress(payload,compresslevel=6,mtime=0) if n in COMPRESSED else payload)
+ temporary.replace(target)
+ if n in COMPRESSED:(DATA/n).unlink(missing_ok=True)
 def fetch(u):
  req=urllib.request.Request(u,headers={'User-Agent':'EdgeDeck personal sports research','Accept':'application/json'})
  with urllib.request.urlopen(req,timeout=18) as r:return json.load(r)
