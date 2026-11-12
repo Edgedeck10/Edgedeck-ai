@@ -147,3 +147,17 @@ class AiRecordTests(unittest.TestCase):
   import ai_record as a
   rows=[self.row(id='alt',player_id='p',base_line=50.5),self.row(id='base',player_id='p',base_line=40.5),self.row(id='base2',player_id='p',base_line=40.5)]
   self.assertEqual(len(a.choose(rows)),1)
+
+
+class UpToTenTests(unittest.TestCase):
+ def test_cap_and_no_filler(self):
+  import ai_record as a
+  rows=[{'id':str(i),'player_id':str(i),'side':'Over','line':10.5,'base_line':10.5,'projection':12,'probability':.6,'sample':10,'fair_odds':-150,'odds':None} for i in range(14)]
+  self.assertEqual(len(a.choose(rows)),10)
+  self.assertEqual(len(a.choose(rows[:3])),3)
+  self.assertEqual(a.choose([{**r,'projection':9} for r in rows]),[])
+ def test_negative_ev_never_fills(self):
+  import ai_record as a
+  r={'id':'a','side':'Over','line':40.5,'projection':44,'probability':.6,'sample':10,'odds':-110,'market':'Total','expected_roi_pct':-1}
+  self.assertEqual(a.choose([r]),[])
+  self.assertEqual(len(a.choose([{**r,'expected_roi_pct':2}])),1)

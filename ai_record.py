@@ -3,15 +3,19 @@ import math,statistics as st
 from collections import defaultdict
 GROUPS={'NFL':'Pro Football','CFL':'Pro Football','UFL':'Pro Football','NCAAF':'College Football','NBA':'Pro Basketball','WNBA':'Pro Basketball','NCAAB':'College Basketball','NCAAW':'College Basketball','NHL':'Hockey','MLB':'Baseball','EPL':'Soccer','MLS':'Soccer','PGA':'Golf','LPGA':'Golf'}
 def mean(xs):return st.mean(xs) if xs else None
+def supported(r):
+ if r.get('sample',0)<5:return False
+ if r.get('odds') is not None:return (r.get('expected_roi_pct') or 0)>0
+ return bool(r.get('player_id') and r.get('projection') is not None and r.get('line') is not None and r['side']=='Over' and r['projection']>r['line'] and r['probability']>.5)
 def choose(rows):
- candidates=[r for r in rows if (not r.get('player_id') or r['side']=='Over' and r['line']==r.get('base_line')) and -200<=(r.get('odds') if r.get('odds') is not None else r.get('fair_odds',-99999))<=200 and not any(str(f).lower() in ('out','suspended','injured reserve','questionable','doubtful') for f in r.get('flags',[]))]
+ candidates=[r for r in rows if supported(r) and (not r.get('player_id') or r['side']=='Over' and r['line']==r.get('base_line')) and -200<=(r.get('odds') if r.get('odds') is not None else r.get('fair_odds',-99999))<=200 and not any(str(f).lower() in ('out','suspended','injured reserve','questionable','doubtful') for f in r.get('flags',[]))]
  candidates.sort(key=lambda r:(-(r.get('odds') is not None and (r.get('expected_roi_pct') or 0)>0),-bool(r.get('player_id')),-(r.get('expected_roi_pct') or 0) if r.get('odds') is not None else 0,-r.get('sample',0),-r['probability']))
  seen=set();result=[]
  for r in candidates:
   key=('player',r['player_id']) if r.get('player_id') else ('market',r['market'],r.get('team_id','game'))
   if key in seen:continue
   seen.add(key);result.append(r)
-  if len(result)==5:break
+  if len(result)==10:break
  return result
 
 def calibration(ledger,before):
@@ -61,3 +65,4 @@ def summarize(ledger):
  for (sport,market),rs in markets.items():
   x=summary(sport+' · '+market,rs);loss=[r for r in rs if r.get('outcome')==0];x['high_confidence_misses']=sum(r['probability']>=.7 for r in loss);x['flagged_misses']=sum(bool(r.get('flags')) for r in loss);x['interpretation']='Review calibration, workload and missing inputs; losses alone do not identify their cause.';diagnostics.append(x)
  return {'records':records,'market_diagnostics':diagnostics,'bundles':bundles,'scope':'First published AI top picks per game, prospectively frozen. Not all alternate thresholds or user tickets. No retrospective top-pick reconstruction.'}
+

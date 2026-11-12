@@ -405,15 +405,18 @@ def main():
  for row in rows:ai_record.apply(row,learning)
  frozen_events={r['event_id'] for r in ai_ledger}
  for event in future:
-  if event['id'] in frozen_events:continue
+  prior=[r for r in ai_ledger if r['event_id']==event['id']]
+  if len(prior)>=10:continue
+  prior_keys={('player',r['player_id']) if r.get('player_id') else ('market',r['market'],r.get('team_id','game')) for r in prior}
   chosen=ai_record.choose([r for r in rows if r['event_id']==event['id']])
-  for rank,r in enumerate(chosen,1):
+  chosen=[r for r in chosen if (('player',r['player_id']) if r.get('player_id') else ('market',r['market'],r.get('team_id','game'))) not in prior_keys][:10-len(prior)]
+  for rank,r in enumerate(chosen,len(prior)+1):
    snapshot={k:v for k,v in r.items() if k not in ('context','recent_values')}
    if r.get('log_key') in PLAYER_LOGS:snapshot['frozen_model']=PLAYER_LOGS[r['log_key']].get('model')
-   snapshot.update({'ai_rank':rank,'ai_selected_at':NOW.isoformat(),'outcome':None,'selection_policy':'game-top-five-v1'})
+   snapshot.update({'ai_rank':rank,'ai_selected_at':NOW.isoformat(),'outcome':None,'selection_policy':'game-up-to-ten-v2'})
    ai_ledger.append(snapshot)
  active_ids={e['id'] for e in future}
- ai_selections={eid:[r for r in ai_ledger if r['event_id']==eid] for eid in active_ids}
+ ai_selections={eid:ai_record.choose([r for r in ai_ledger if r['event_id']==eid]) for eid in active_ids}
  ai_summary=ai_record.summarize(ai_ledger)
  write('ai_picks.json',ai_ledger)
  # Record one pregame forecast for each exact suggested line; never mutate it when refreshing.
@@ -434,6 +437,7 @@ def main():
  write('events.json',events);write('history.json',history);write('latest.json',report);write('cache.json',cache)
  print(f'{len(future)} upcoming games | {len(rows)} lines | {sum(bool(r.get("player_id")) for r in rows)} player lines | {len(settled)} settled | {len(ERRORS)} feed errors')
 if __name__=='__main__':main()
+
 
 
 
