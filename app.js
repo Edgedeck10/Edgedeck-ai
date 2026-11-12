@@ -18,35 +18,21 @@ function enrich(r){if(r.odds!=null){r.break_even=implied(r.odds);r.edge_pp=(r.pr
 
 const SPORT_GROUPS=[
  ['all','All sports','◈',[], 'Explore player props and game markets across the board.'],
- ['basketball','Basketball','🏀',['NBA','WNBA','NCAAB','NCAAW','EUROLEAGUE'],'Points, rebounds, assists, threes and combination props.'],
  ['football','Football','🏈',['NFL','NCAAF','CFL','UFL'],'Passing, rushing, receiving, touchdowns and game lines.'],
+ ['basketball','Basketball','🏀',['NBA','WNBA','NCAAB','NCAAW','EUROLEAGUE'],'Points, rebounds, assists, threes and combination props.'],
  ['hockey','Hockey','🏒',['NHL'],'Shots on goal, saves, points and game totals.'],
- ['soccer','Soccer','⚽',['EPL','MLS','UCL','LALIGA','BUNDESLIGA','SERIEA','LIGUE1','NWSL'],'Goals, shots, saves and match markets.'],
  ['baseball','Baseball','⚾',['MLB','NPB','KBO'],'Hits, total bases, strikeouts, runs and game lines.'],
- ['tennis','Tennis','🎾',['ATP','WTA','TENNIS'],'Match winners, sets, games and aces.'],
  ['golf','Golf','⛳',['PGA','LPGA','GOLF'],'Tournament finishes, round markets and head-to-heads.'],
- ['mma','MMA / UFC','🥊',['UFC','MMA'],'Fight winners, rounds and method of victory.'],
- ['boxing','Boxing','🥊',['BOXING'],'Fight winners, totals and round markets.'],
- ['racing','Motorsport','🏁',['F1','NASCAR','INDYCAR'],'Race winners, podiums and driver matchups.'],
- ['cricket','Cricket','🏏',['CRICKET','IPL'],'Runs, wickets and match winners.'],
- ['rugby','Rugby','🏉',['RUGBY','RUGBY LEAGUE'],'Match winners, handicaps and totals.'],
- ['tabletennis','Table tennis','🏓',['TABLE TENNIS'],'Match winners, sets and totals.'],
- ['volleyball','Volleyball','🏐',['VOLLEYBALL'],'Match winners, sets and points.'],
- ['handball','Handball','🤾',['HANDBALL'],'Match winners, spreads and totals.'],
- ['darts','Darts','🎯',['DARTS'],'Match winners, legs and sets.'],
- ['snooker','Snooker','🎱',['SNOOKER'],'Match winners and frame markets.'],
- ['aussie','Aussie rules','🏉',['AFL'],'Match winners, totals and player markets.'],
- ['horses','Horse racing','🏇',['HORSE RACING'],'Race and runner research; availability varies by platform.'],
- ['esports','Esports','🎮',['ESPORTS'],'Match and map markets; availability varies by location.'],
- ['other','Other sports','✦',[],'Imported research for additional sports and competitions.']
+ ['soccer','Soccer','⚽',['EPL','MLS','UCL','LALIGA','BUNDESLIGA','SERIEA','LIGUE1','NWSL'],'Goals, shots, saves and match markets.'],
 ];
+function majorSport(r){return SPORT_GROUPS.some(g=>g[3].includes(String(r.sport||'').toUpperCase()))}
 let selectedSportGroup='all';
 const sportGroup=()=>SPORT_GROUPS.find(g=>g[0]===selectedSportGroup)||SPORT_GROUPS[0];
-function matchesSport(r){const g=sportGroup(),code=String(r.sport||'').toUpperCase();return (!$('sport').value||code===$('sport').value)&&(g[0]==='all'||(g[0]==='other'?!SPORT_GROUPS.some(x=>x[3].includes(code)):g[3].includes(code)))}
-function sportOptions(){const g=sportGroup(),codes=g[0]==='all'?[...SPORT_GROUPS.flatMap(x=>x[3]),...all().map(x=>x.sport)]:g[0]==='other'?all().map(x=>x.sport).filter(code=>!SPORT_GROUPS.some(x=>x[3].includes(code))):g[3];setOptions('sport',codes,'All leagues');}
+function matchesSport(r){const g=sportGroup(),code=String(r.sport||'').toUpperCase();return majorSport(r)&&(!$('sport').value||code===$('sport').value)&&(g[0]==='all'||(g[0]==='other'?!SPORT_GROUPS.some(x=>x[3].includes(code)):g[3].includes(code)))}
+function sportOptions(){const g=sportGroup(),codes=g[0]==='all'?SPORT_GROUPS.flatMap(x=>x[3]):g[0]==='other'?all().map(x=>x.sport).filter(code=>!SPORT_GROUPS.some(x=>x[3].includes(code))):g[3];setOptions('sport',codes,'All leagues');}
 function selectSportGroup(id){selectedSportGroup=id;$('sport').value='';$('market').value='';$('search').value='';$('lineType').value='';$('day').value='';$('positive').checked=false;$('hideFlags').checked=false;quick='all';page=30;sportOptions();renderBoard();renderGames();if(historyLoaded)renderHistory();}
 function renderSportNavigation(){
- const g=sportGroup(),available=all().filter(active),counts=new Map();for(const r of available)counts.set(r.sport,(counts.get(r.sport)||0)+1);
+ const g=sportGroup(),available=all().filter(r=>active(r)&&majorSport(r)),counts=new Map();for(const r of available)counts.set(r.sport,(counts.get(r.sport)||0)+1);
  $('sportsRail').innerHTML=SPORT_GROUPS.map(x=>{const n=x[0]==='all'?available.length:x[0]==='other'?available.filter(r=>!SPORT_GROUPS.some(z=>z[3].includes(r.sport))).length:x[3].reduce((n,c)=>n+(counts.get(c)||0),0);return `<button class="sport-tab ${x[0]===g[0]?'active':''}" data-sport-group="${x[0]}" aria-pressed="${x[0]===g[0]}"><span aria-hidden="true">${x[2]}</span><b>${esc(x[1])}</b><small>${n?n.toLocaleString()+' lines':'No active lines'}</small></button>`}).join('');
  const scoped=available.filter(matchesSport),markets=[...new Set(scoped.map(x=>x.market))].sort(),old=$('market').value;
  setOptions('market',markets,'All markets');if(markets.includes(old))$('market').value=old;
