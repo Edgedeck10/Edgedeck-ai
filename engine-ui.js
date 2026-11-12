@@ -4,8 +4,8 @@ function enginePrice(r,line=r.line,side=r.side,odds=r.odds){
  const model=engineFor(r);if(!model)return null;
  const ps=[],pushes=[],evs=[];
  for(const h of model.draw_histograms){let total=0,w=0,u=0;for(const [y,n] of Object.entries(h)){total+=n;if(Number(y)===line)u+=n;else if(side==='Under'?Number(y)<line:Number(y)>line)w+=n}const p=Math.max(0,Math.min(1-u/total,w/total+(line===r.line&&side===r.side?(r.learning_offset||0):0)));ps.push(p);pushes.push(u/total);if(odds!=null)evs.push(p*(decimal(odds)-1)-(1-p-u/total))}
- const avg=a=>a.reduce((x,y,i)=>x+y*(model.scenario_weights?.[i]??1/a.length),0),q=(a,p)=>{a=[...a].sort((x,y)=>x-y);return a[Math.floor((a.length-1)*p)]},p=avg(ps),push=avg(pushes),conditional=Math.max(.0001,Math.min(.9999,p/(1-push)||.5));
- return {probability:p,push_probability:push,fair_odds:fair(conditional),probability_range_80:[Math.min(...ps),Math.max(...ps)],expected_roi_pct:evs.length?100*avg(evs):null,ev_lower_80_pct:evs.length?100*Math.min(...evs):null,probability_positive_ev:null};
+ const avg=a=>a.reduce((x,y,i)=>x+y*(model.scenario_weights?.[i]??1/a.length),0),q=(a,p)=>{a=[...a].sort((x,y)=>x-y);return a[Math.floor((a.length-1)*p)]},p=(line===r.line&&side===r.side&&r.learning_offset?r.probability:avg(ps)),push=avg(pushes),conditional=Math.max(.0001,Math.min(.9999,p/(1-push)||.5));
+ return {probability:p,push_probability:push,fair_odds:fair(conditional),probability_range_80:[Math.min(...ps),Math.max(...ps)],expected_roi_pct:evs.length?100*(p*(decimal(odds)-1)-(1-p-push)):null,ev_lower_80_pct:evs.length?100*Math.min(...evs):null,probability_positive_ev:null};
 }
 function evidencePanel(r){
  const m=engineFor(r);if(!m)return '<details><summary>Model coverage</summary><p class="small">Legacy game model or user-supplied estimate. The opportunity engine has not been applied to this selection.</p></details>';
