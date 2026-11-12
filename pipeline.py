@@ -12,7 +12,7 @@ ROOT=pathlib.Path(__file__).parent; DATA=ROOT/'data'/'classic'; DATA.mkdir(paren
 NOW=dt.datetime.now(dt.timezone.utc); TODAY=NOW.astimezone(ZoneInfo('America/Indiana/Indianapolis')).date()
 SPORTS={'NBA':'basketball/nba','NFL':'football/nfl','NHL':'hockey/nhl','MLB':'baseball/mlb','NCAAF':'football/college-football','NCAAB':'basketball/mens-college-basketball','WNBA':'basketball/wnba','EPL':'soccer/eng.1','MLS':'soccer/usa.1'}
 DEFAULTS={'NBA':(112,15),'NCAAB':(74,12),'WNBA':(81,12),'NFL':(23,10),'NCAAF':(28,15),'MLB':(4.5,3),'NHL':(3,1.8),'EPL':(1.4,1.3),'MLS':(1.5,1.4)}
-MODEL='opportunity-4.1.0'; ERRORS=[]; CAL_CACHE={}; PLAYER_LOGS={}
+MODEL='opportunity-4.2.0'; ERRORS=[]; CAL_CACHE={}; PLAYER_LOGS={}
 COMPRESSED={'latest.json','history.json','cache.json'}
 def read(n,d):
  packed=DATA/(n+'.gz')
@@ -128,10 +128,13 @@ def team_factors(events,e,side):
    if a.get('score') is not None and b.get('score') is not None:own.append(a['score']);allowed.append(b['score'])
   return own,allowed
  own,allowed=scores(past,t['id']);oppown,oppallow=scores(opp,o['id']);mu=(mean(own,base)+mean(oppallow,base))/2
+ blend=mu
  rest=max(0,(iso(e['start'])-iso(past[-1]['start'])).total_seconds()/86400-1) if past else None
  if e['sport'] in ('NBA','WNBA','NCAAB') and rest is not None and rest<.5:mu*=.98
- mu+=({'NBA':1.5,'NFL':1.0,'NCAAF':1.5}.get(e['sport'],.25))*(1 if side=='home' else -1)
- return mu,{'games':len(own),'points_for':round(mean(own,base),1),'points_allowed':round(mean(allowed,base),1),'opponent_allowed':round(mean(oppallow,base),1),'rest_days':round(rest,1) if rest is not None else None,'back_to_back':rest is not None and rest<.5,'last5':own[-5:],'sd':max(sd,st.pstdev(own) if len(own)>2 else sd)}
+ rest_adjusted=mu
+ venue_adjustment=({'NBA':1.5,'NFL':1.0,'NCAAF':1.5}.get(e['sport'],.25))*(1 if side=='home' else -1)
+ mu+=venue_adjustment
+ return mu,{'team_name':t['name'],'team_id':t['id'],'opponent_name':o['name'],'scoring_average':mean(own,base),'opponent_allowed_average':mean(oppallow,base),'scoring_games':len(own),'opponent_defense_games':len(oppallow),'fallback_scoring':not own,'fallback_defense':not oppallow,'fallback_value':base,'blend':blend,'rest_adjustment':rest_adjusted-blend,'venue_adjustment':venue_adjustment,'projected_score':mu,'source_games':[{'event_id':g['id'],'date':g['start'],'event':g['event'],'home_score':g['home'].get('score'),'away_score':g['away'].get('score'),'source_url':g.get('source_url')} for g in {x['id']:x for x in past+opp}.values()],'games':len(own),'points_for':round(mean(own,base),1),'points_allowed':round(mean(allowed,base),1),'opponent_allowed':round(mean(oppallow,base),1),'rest_days':round(rest,1) if rest is not None else None,'back_to_back':rest is not None and rest<.5,'last5':own[-5:],'sd':max(sd,st.pstdev(own) if len(own)>2 else sd)}
 
 def calibrate(history,key,p):
  # One immutable first forecast per event/entity/market/direction, fit past events only.
@@ -204,7 +207,9 @@ def team_rows(events,e,history):
     if all(x is not None for x in v):values.append(sum(v))
   if len(values)>=5:
    mu=mean(values);sig=max(st.pstdev(values),3)
-   for side in ('Over','Under'):rows.append(make_row(e,period,side,math.floor(mu)+.5,mu,sig,history,selection=e['event'],sample=len(values),flags=['Unvalidated period model']))
+   for side in ('Over','Under'):rows.append(make_row(e,period,side,math.floor(mu)+.5,mu,sig,history,selection=e['event'],sample=len(values),projection_evidence={'kind':'period','samples':values,'mean':mu,'sd':sig},flags=['Unvalidated period model']))
+ for r in rows:
+  if 'projection_evidence' not in r:r['projection_evidence']={'kind':'team','home':hf,'away':af,'total':h+a,'home_margin':h-a,'formula':'Each team = (scoring average + opposing points allowed average) / 2 + rest adjustment + venue adjustment','limitations':['Fixed venue and rest coefficients are legacy assumptions, not fitted effects.','No weather, current injury impact, pace, game-script or position-specific adjustment is included.','The model is not prospectively validated.']}
  return rows
 
 BASKET={'Points':(5,1),'Rebounds':(2,1),'Assists':(2,1),'PRA':(5,1),'Points + rebounds':(5,1),'Points + assists':(5,1),'Rebounds + assists':(2,1),'Threes':(1,1),'Steals':(1,1),'Blocks':(1,1)}
@@ -402,4 +407,5 @@ def main():
  write('events.json',events);write('history.json',history);write('latest.json',report);write('cache.json',cache)
  print(f'{len(future)} upcoming games | {len(rows)} lines | {sum(bool(r.get("player_id")) for r in rows)} player lines | {len(settled)} settled | {len(ERRORS)} feed errors')
 if __name__=='__main__':main()
+
 

@@ -106,3 +106,18 @@ class MatchupTests(unittest.TestCase):
   d={'boxscore':{'players':[{'team':{'id':'h'},'statistics':[{'name':'forwards','labels':['S','TOI'],'athletes':[{'athlete':{'id':'p'},'stats':['4','18:30']}]},{'name':'shootout','labels':['SOG'],'athletes':[{'athlete':{'id':'p'},'stats':['0']}]}]}]}}
   r=pipeline.parse_box(d,e)[0]
   self.assertEqual(r['stats']['Shots on goal'],4)
+
+
+class ProjectionEvidenceTests(unittest.TestCase):
+ def test_total_explanation_reconciles(self):
+  import pipeline as p,datetime as dt
+  e={'id':'NFL:next','sport':'NFL','event':'Away at Home','start':(p.NOW+dt.timedelta(days=1)).isoformat(),'day':p.TODAY.isoformat(),'home':{'id':'h','name':'Home'},'away':{'id':'a','name':'Away'},'source_url':'https://www.espn.com'}
+  g={'id':'NFL:past','sport':'NFL','event':'Away at Home','start':(p.NOW-dt.timedelta(days=7)).isoformat(),'final':True,'home':{'id':'h','name':'Home','score':28},'away':{'id':'a','name':'Away','score':17},'source_url':'https://www.espn.com'}
+  rows=p.team_rows({g['id']:g},e,[]);r=next(r for r in rows if r['market']=='Total');x=r['projection_evidence']
+  self.assertEqual(x['home']['blend'],28)
+  self.assertEqual(x['away']['blend'],17)
+  self.assertAlmostEqual(x['home']['projected_score'],29)
+  self.assertAlmostEqual(x['away']['projected_score'],16)
+  self.assertAlmostEqual(x['total'],45)
+  self.assertAlmostEqual(r['projection'],x['total'],places=2)
+  self.assertEqual(x['home']['source_games'][0]['event_id'],g['id'])
