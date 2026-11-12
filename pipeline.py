@@ -430,9 +430,9 @@ def main():
   if daily.eligible(r,TODAY.isoformat(),NOW.isoformat()) or daily.eligible(r,TODAY.isoformat(),NOW.isoformat(),True):r['rationale']=pick_evidence.build(r,events,injuries,PLAYER_LOGS,scores)
  research=[]
  for sport in daily.SPORTS:
-  candidates=[r for r in rows if r['id'] in slate_ids and r['sport']==sport and daily.in_window(r,NOW.isoformat()) and r.get('player_id') and r.get('side')=='Over' and r.get('odds') is None and r.get('sample',0)>=(8 if sport in ('NFL','NCAAF') else 10) and r.get('selection_probability',r['probability'])>=.5 and r.get('probability_floor',0)>.5 and not any(any(term in f.lower() for term in ('questionable','doubtful','day-to-day','outlier','role changed','minutes volatility','unresolved','starter unconfirmed','opportunity data missing')) for f in r.get('flags',[]))]
+  candidates=[r for r in slate_rows if r['sport']==sport and r.get('odds') is None and daily.proposal_valid(r,NOW.isoformat())]
   used_games=set();used_players=set()
-  for r in sorted(candidates,key=lambda r:(min(r['probability_floor'],r['hit_rate']),r.get('sample',0)),reverse=True):
+  for r in sorted(candidates,key=daily.proposal_rank,reverse=True):
    if r['event_id'] in used_games or r['player_id'] in used_players:continue
    watch={k:v for k,v in r.items() if k not in ('context','reasoning','recent_values')};watch['rationale']=pick_evidence.build(r,events,injuries,PLAYER_LOGS,scores);research.append(watch);used_games.add(r['event_id']);used_players.add(r['player_id'])
 
@@ -446,18 +446,18 @@ def main():
  for r in best_targets:
   if r['sport'] in best_sports:continue
   r['rationale']=pick_evidence.build(r,events,injuries,PLAYER_LOGS,scores);best_rows.append(r);best_sports.add(r['sport'])
- estimated_current,estimated_summary=daily.update_research(estimated_ledger,best_rows,TODAY.isoformat(),NOW.isoformat(),events,box,settle,sizes=(1,),policy='estimated-best-evidence-v10',over_only=True,min_decimal=1)
+ estimated_current,estimated_summary=daily.update_research(estimated_ledger,best_rows,TODAY.isoformat(),NOW.isoformat(),events,box,settle,sizes=(1,),policy='estimated-best-open-v11',over_only=True,min_decimal=1)
  estimated_current=copy.deepcopy(estimated_current)
  for ticket in estimated_current:ticket['current_review']=news_feed.review(ticket,rows,events,injuries,news,NOW.isoformat())
  perfect_current,perfect_summary=daily.update_research(perfect_ledger,perfect_safe,TODAY.isoformat(),NOW.isoformat(),events,box,settle,sizes=(5,7,9),policy='perfect-history-confidence-v6',over_only=True,min_decimal=1)
  daily_current,daily_summary,daily_availability=daily.update(daily_ledger,slate_rows,TODAY.isoformat(),NOW.isoformat(),events,box,settle,min_decimal=1)
- research_current,research_summary=daily.update_research(research_ledger,research,TODAY.isoformat(),NOW.isoformat(),events,box,settle,policy='research-evidence-v9',over_only=True,min_decimal=1,sizes=range(2,len(research)+1))
+ research_current,research_summary=daily.update_research(research_ledger,research,TODAY.isoformat(),NOW.isoformat(),events,box,settle,policy='research-open-v10',over_only=True,min_decimal=1,sizes=range(2,len(research)+1))
  # Interleave the best eligible target per sport before adding additional legs.
  cross_rows=[];sport_pools={s:[r for r in research if r['sport']==s] for s in daily.SPORTS}
  for i in range(max([len(v) for v in sport_pools.values()] or [0])):
   batch=[v[i] for v in sport_pools.values() if len(v)>i]
   cross_rows+=sorted(batch,key=lambda r:r.get('probability_floor',0),reverse=True)
- cross_current,cross_summary=daily.update_research(cross_ledger,cross_rows,TODAY.isoformat(),NOW.isoformat(),events,box,settle,policy='cross-evidence-v3',over_only=True,min_decimal=1,sizes=range(2,len(cross_rows)+1),sports=['CROSS'])
+ cross_current,cross_summary=daily.update_research(cross_ledger,cross_rows,TODAY.isoformat(),NOW.isoformat(),events,box,settle,policy='cross-open-v4',over_only=True,min_decimal=1,sizes=range(2,len(cross_rows)+1),sports=['CROSS'])
  cross_current=copy.deepcopy(cross_current)
  for ticket in cross_current:ticket['current_review']=news_feed.review(ticket,rows,events,injuries,news,NOW.isoformat())
  research_current=copy.deepcopy(research_current)
@@ -469,8 +469,8 @@ def main():
  for ticket in daily_current:ticket['current_review']=news_feed.review(ticket,rows,events,injuries,news,NOW.isoformat())
  for r in research:r['current_review']=news_feed.review({'legs':[r]},rows,events,injuries,news,NOW.isoformat())
  # Freeze a separate recommended portfolio, one first selection per game.
- priced_candidates=[r for r in rows if r.get('value_status')=='Provisional value' and r['sample']>=8 and not any(x.lower() in ('questionable','doubtful','out','minutes volatility') for x in r['flags'])]
- unpriced_candidates=[r for r in rows if r.get('player_id') and r.get('odds') is None and r['sample']>=8 and .52<=r['probability'] and an.price_in_band(r.get('estimated_price')) and not any(x.lower() in ('questionable','doubtful','out','minutes volatility') for x in r['flags'])]
+ priced_candidates=[r for r in slate_rows if daily.eligible(r,TODAY.isoformat(),NOW.isoformat())]
+ unpriced_candidates=daily.estimated_singles(slate_rows,NOW.isoformat())
  candidates=sorted(priced_candidates,key=lambda r:r['research_score'],reverse=True)+sorted(unpriced_candidates,key=lambda r:r['research_score'],reverse=True)
  portfolio_seen={r['event_id'] for r in shortlist if r.get('model_version')==MODEL};featured=[];featured_games=set()
  for r in candidates:

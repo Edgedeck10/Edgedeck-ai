@@ -2,7 +2,7 @@
 import math,datetime as dt
 from collections import defaultdict
 from zoneinfo import ZoneInfo
-POLICY='daily-v4-fanduel-only';SPORTS=['NBA','NFL','NHL','MLB','NCAAB','NCAAF','WNBA','EPL','MLS','PGA','ATP','WTA','UFC']
+POLICY='daily-v5-evidence';SPORTS=['NBA','NFL','NHL','MLB','NCAAB','NCAAF','WNBA','EPL','MLS','PGA','ATP','WTA','UFC']
 def timestamp(s):return dt.datetime.fromisoformat(s.replace('Z','+00:00'))
 def decimal(o):return 1+100/abs(o) if o<0 else 1+o/100
 def odds_from_decimal(d):return round((d-1)*100) if d>=2 else round(-100/(d-1))
@@ -20,15 +20,15 @@ def fanduel_verified(r,now):
  except (KeyError,ValueError,TypeError):return False
 
 def eligible(r,day,now,parlay=False):
- if not fanduel_verified(r,now):return False
- if not in_window(r,now) or not (isinstance(r.get('odds'),(int,float)) and ((-1500<=r['odds']<=-100 or 100<=r['odds']<=200) if parlay else price_band(r['odds']))) or r.get('sample',0)<(8 if r.get('sport') in ('NFL','NCAAF') and not r.get('player_id') else 10):return False
- if r.get('price_kind')!='Observed snapshot' or r.get('probability',0)<.60:return False
- if any(x.lower() in ('questionable','doubtful','out','minutes volatility','role changed','outlier-sensitive','starter unconfirmed','opportunity data missing','day-to-day','teammate usage unresolved') for x in r.get('flags',[])):return False
- try:
-  if timestamp(r['start'])<=timestamp(now)+dt.timedelta(minutes=10):return False
-  if not dt.timedelta(0)<=timestamp(now)-timestamp(r.get('odds_updated') or r['observed_at'])<=dt.timedelta(minutes=35):return False
- except (ValueError,KeyError,TypeError):return False
- return (r.get('conservative_edge_pp') or 0)>0 and 3<=(r.get('edge_pp') or 0)<=15 and (r.get('expected_roi_pct') or 0)>=5
+ if not fanduel_verified(r,now) or not in_window(r,now):return False
+ o=r.get('odds');p=r.get('probability')
+ if not isinstance(o,(int,float)) or not math.isfinite(o) or abs(o)<100:return False
+ if not isinstance(p,(int,float)) or not math.isfinite(p) or not 0<p<1:return False
+ if r.get('price_kind')!='Observed snapshot':return False
+ if any(f.lower() in ('out','doubtful','opportunity data missing') for f in r.get('flags',[])):return False
+ # Actual positive expected value remains necessary to call a quote a value bet.
+ return p*decimal(o)>1
+
 
 def selection_days(rows,now):
  local=timestamp(now).astimezone(ZoneInfo('America/Indiana/Indianapolis'));today=local.date();result={}
@@ -44,12 +44,19 @@ def in_selection_day(r,days):
  try:return timestamp(r['start']).astimezone(ZoneInfo('America/Indiana/Indianapolis')).date().isoformat()==days.get(r['sport'])
  except (KeyError,ValueError,TypeError):return False
 
+def proposal_valid(r,now):
+ return (r.get('player_id') and r.get('side')=='Over' and in_window(r,now)
+  and isinstance(r.get('probability'),(int,float)) and math.isfinite(r['probability']) and 0<r['probability']<1
+  and isinstance(r.get('projection'),(int,float)) and math.isfinite(r['projection'])
+  and not any(f.lower() in ('out','doubtful','opportunity data missing') for f in r.get('flags',[])))
+
+def proposal_rank(r):
+ # Evidence uncertainties lower priority instead of silently removing the option.
+ unresolved=sum(f.lower() in ('questionable','day-to-day','starter unconfirmed','role changed','teammate usage unresolved') for f in r.get('flags',[]))
+ return (-unresolved,r.get('probability_floor',0),r.get('selection_probability',r.get('probability',0)),r.get('sample',0))
+
 def estimated_singles(rows,now):
- # Rank confidence at model-fair prices near even money; no book offer or verified value inferred.
- bad=('questionable','doubtful','out','minutes volatility','role changed','outlier-sensitive','starter unconfirmed','opportunity data missing','day-to-day','teammate usage unresolved')
- pool=[r for r in rows if r.get('player_id') and r.get('odds') is None and r.get('side')=='Over' and in_window(r,now) and r.get('sample',0)>=(8 if r.get('sport') in ('NFL','NCAAF') else 10) and r.get('selection_probability',r.get('probability',0))>=.5 and r.get('probability_floor',0)>.5 and not any(f.lower() in bad for f in r.get('flags',[]))]
- # Do not relax unresolved-role exclusions merely to fill the board.
- return sorted(pool,key=lambda r:(r.get('selection_tier') is None,min(r.get('probability_floor',0),r.get('hit_rate',0)),r.get('sample',0)),reverse=True)
+ return sorted((r for r in rows if r.get('odds') is None and proposal_valid(r,now)),key=proposal_rank,reverse=True)
 
 
 def freeze_leg(r):
@@ -86,7 +93,7 @@ def update(records,rows,day,now,events,box,settle,min_decimal=1):
     if r.get('player_id'):players.add(r['player_id'])
    return diverse
   singles,parlay_pool=ranked(False),ranked(True)
-  availability[sport]={'eligible_games':len(singles),'parlay_games':len(parlay_pool),'policy':POLICY,'reason':'FanDuel Indiana verification required; current public feed does not supply it. Singles: observed +200 to -200, 60%+ model estimate, 10+ samples and positive buffered value. Parlays: quoted positive-value 60%+ legs through -1500, next seven days. No preset hit-rate goal. Rank supported estimates and require actual price evidence for value claims.','sizes':{}}
+  availability[sport]={'eligible_games':len(singles),'parlay_games':len(parlay_pool),'policy':POLICY,'reason':'FanDuel Indiana verification required; current public feed does not supply it. Quoted selections use valid fresh prices and positive estimated value without preset odds or hit-rate bands. No preset hit-rate goal. Rank supported estimates and require actual price evidence for value claims.','sizes':{}}
   for size in range(1,11):
    key=(day,sport,size);diverse=singles if size==1 else parlay_pool
    if len(diverse)<size:
@@ -96,7 +103,7 @@ def update(records,rows,day,now,events,box,settle,min_decimal=1):
     availability[sport]['sizes'][str(size)]='Total quote must be +100 or greater.';continue
    availability[sport]['sizes'][str(size)]='Quoted positive-value combination; '+('meets' if p>=.65 else 'below')+' the 65% modeled joint target.'
    if key in seen:continue
-   ticket={'id':f'{day}:{sport}:{size}:{POLICY}','policy_version':POLICY,'day':day,'sport':sport,'leg_count':size,'created_at':now,'legs':legs,'probability':round(p,6),'buffered_probability':round(floor,6),'candidate_count':len(diverse),'target_met':p>=.65 and (size==1 or all(r['probability']>=.8 for r in legs)),'scope':'Next seven days','joint_bounds':[max(0,sum(r['probability'] for r in legs)-(size-1)),min(r['probability'] for r in legs)],'probability_method':'Single forecast' if size==1 else 'Independent leg product; not correlation adjusted','display_odds':legs[0]['odds'] if size==1 else odds_from_decimal(d),'leg_product_decimal':round(d,5),'price_type':'Observed single quote' if size==1 else 'Quoted-leg product estimate, not a sportsbook parlay quote','result':None,'profit_units':None,'model_version':legs[0].get('model_version'),'selection_method':'Confidence first among positive-value observed quotes: highest risk-buffered probability, then buffered price edge, then sample size. One selection per event, no repeated player. Quoted parlay comparisons use 60%+ positive-value legs. A joint estimate below 65% is explicitly labeled below target; no success rate is implied.'}
+   ticket={'id':f'{day}:{sport}:{size}:{POLICY}','policy_version':POLICY,'day':day,'sport':sport,'leg_count':size,'created_at':now,'legs':legs,'probability':round(p,6),'buffered_probability':round(floor,6),'candidate_count':len(diverse),'target_met':True,'scope':'Next seven days','joint_bounds':[max(0,sum(r['probability'] for r in legs)-(size-1)),min(r['probability'] for r in legs)],'probability_method':'Single forecast' if size==1 else 'Independent leg product; not correlation adjusted','display_odds':legs[0]['odds'] if size==1 else odds_from_decimal(d),'leg_product_decimal':round(d,5),'price_type':'Observed single quote' if size==1 else 'Quoted-leg product estimate, not a sportsbook parlay quote','result':None,'profit_units':None,'model_version':legs[0].get('model_version'),'selection_method':'Confidence first among positive-value observed quotes: highest risk-buffered probability, then buffered price edge, then sample size. One selection per event, no repeated player. No preset hit-rate or odds target; joint estimates assume independence.'}
    records.append(ticket);seen.add(key)
  current=[r for r in records if r['day']==day and r.get('policy_version')==POLICY]
  summaries={}
