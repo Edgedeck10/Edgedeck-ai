@@ -47,7 +47,7 @@ def in_selection_day(r,days):
 def estimated_singles(rows,now):
  # Rank confidence at model-fair prices near even money; no book offer or verified value inferred.
  bad=('questionable','doubtful','out','minutes volatility','role changed','outlier-sensitive','starter unconfirmed','opportunity data missing','day-to-day','teammate usage unresolved')
- pool=[r for r in rows if r.get('player_id') and r.get('odds') is None and r.get('side')=='Over' and in_window(r,now) and r.get('sample',0)>=(8 if r.get('sport') in ('NFL','NCAAF') else 10) and .60<=r.get('selection_probability',r.get('probability',0))<=.97 and (r.get('hit_rate') or 0)>=.45 and not any(f.lower() in bad for f in r.get('flags',[]))]
+ pool=[r for r in rows if r.get('player_id') and r.get('odds') is None and r.get('side')=='Over' and in_window(r,now) and r.get('sample',0)>=(8 if r.get('sport') in ('NFL','NCAAF') else 10) and r.get('selection_probability',r.get('probability',0))>=.5 and r.get('probability_floor',0)>.5 and not any(f.lower() in bad for f in r.get('flags',[]))]
  # Do not relax unresolved-role exclusions merely to fill the board.
  return sorted(pool,key=lambda r:(r.get('selection_tier') is None,min(r.get('probability_floor',0),r.get('hit_rate',0)),r.get('sample',0)),reverse=True)
 
@@ -86,7 +86,7 @@ def update(records,rows,day,now,events,box,settle,min_decimal=1):
     if r.get('player_id'):players.add(r['player_id'])
    return diverse
   singles,parlay_pool=ranked(False),ranked(True)
-  availability[sport]={'eligible_games':len(singles),'parlay_games':len(parlay_pool),'policy':POLICY,'reason':'FanDuel Indiana verification required; current public feed does not supply it. Singles: observed +200 to -200, 60%+ model estimate, 10+ samples and positive buffered value. Parlays: quoted positive-value 60%+ legs through -1500, next seven days. Joint estimates below 65% are shown as below-target comparisons. Otherwise no qualifying pick; 85–90% remains an unproven goal.','sizes':{}}
+  availability[sport]={'eligible_games':len(singles),'parlay_games':len(parlay_pool),'policy':POLICY,'reason':'FanDuel Indiana verification required; current public feed does not supply it. Singles: observed +200 to -200, 60%+ model estimate, 10+ samples and positive buffered value. Parlays: quoted positive-value 60%+ legs through -1500, next seven days. No preset hit-rate goal. Rank supported estimates and require actual price evidence for value claims.','sizes':{}}
   for size in range(1,11):
    key=(day,sport,size);diverse=singles if size==1 else parlay_pool
    if len(diverse)<size:
@@ -104,7 +104,7 @@ def update(records,rows,day,now,events,box,settle,min_decimal=1):
   summaries[sport]={}
   for size in range(1,11):
    ts=[r for r in records if r['sport']==sport and r['leg_count']==size];won=sum(r.get('result')=='win' for r in ts);lost=sum(r.get('result')=='loss' for r in ts);push=sum(r.get('result')=='push' for r in ts);settled=won+lost
-   summaries[sport][str(size)]={'tracked':len(ts),'wins':won,'losses':lost,'pushes':push,'pending':sum(r.get('result') is None for r in ts),'win_rate':won/settled if settled else None,'ci95':wilson(won,settled),'profit_units':round(sum(r.get('profit_units') or 0 for r in ts),4),'roi_pct':round(100*sum(r.get('profit_units') or 0 for r in ts)/settled,2) if settled else None,'sample_status':'Too early to judge' if settled<30 else 'Sample accumulating; inspect uncertainty','goal':[.85,.90] if size==1 else [.65,.80]}
+   summaries[sport][str(size)]={'tracked':len(ts),'wins':won,'losses':lost,'pushes':push,'pending':sum(r.get('result') is None for r in ts),'win_rate':won/settled if settled else None,'ci95':wilson(won,settled),'profit_units':round(sum(r.get('profit_units') or 0 for r in ts),4),'roi_pct':round(100*sum(r.get('profit_units') or 0 for r in ts)/settled,2) if settled else None,'sample_status':'Too early to judge' if settled<30 else 'Sample accumulating; inspect uncertainty'}
  return current,summaries,availability
 
 def update_research(records,rows,day,now,events,box,settle,sizes=range(2,11),policy='research-week-v1',over_only=False,min_decimal=1,sports=None):
