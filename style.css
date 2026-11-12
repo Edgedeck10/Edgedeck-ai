@@ -13,3 +13,6 @@ body{background:linear-gradient(135deg,#0c2340 0%,#102c42 55%,#0c493b 100%);back
 
 /* Compact picks-first header. Errors and stale-feed notices remain visible. */
 .notice:empty{display:none}.sport-browser{padding:12px 0}.sport-summary{padding-top:8px}.sport-summary h3{font-size:1rem;margin:4px 0}.sport-summary p{margin:4px 0}.section-head p{font-size:.85rem}.sport-tab{min-width:125px}
+
+
+.game-picks{background:#fff;color:#0c2340;border:1px solid #c6a64b;border-radius:12px;margin:10px 0;padding:14px}.game-picks>summary{cursor:pointer;font-size:.95rem}.game-pick{border-top:2px solid #d9bd63;padding:16px 0}.game-pick select,.game-pick input,.game-basket input{width:100%;margin:6px 0}.game-pick input[type=checkbox]{width:auto}.game-basket{background:#f1f6f4;padding:14px;border-radius:10px}.game-pick-board{margin:18px 0}
