@@ -13,7 +13,7 @@ class EngineTests(unittest.TestCase):
   x=a.price(e,1,'Over',100)
   self.assertEqual(x['probability'],.5);self.assertEqual(x['push_probability'],.25)
   self.assertAlmostEqual(x['expected_roi_pct'],25)
-  self.assertEqual(x['probability_positive_ev'],1)
+  self.assertIsNone(x['probability_positive_ev']);self.assertEqual(x['positive_ev_scenario_weight'],1)
   self.assertIsNone(a.price(e,1,'Over')['expected_roi_pct'])
  def test_finite_attempts(self):
   rs=[{'start':f'2026-01-{i+1:02d}','stats':{'Threes':i%3,'Three attempts':3}} for i in range(12)]
@@ -24,10 +24,10 @@ class EngineTests(unittest.TestCase):
   x=a.fit(rs,{},'NFL','Receiving yards','1','signed')
   self.assertTrue(any(float(y)<0 for h in x['evidence']['draw_histograms'] for y in h))
  def test_nested_window_holdout(self):
-  ps=[(r,r['stats']['Points'],30) for r in self.records(range(25))]
+  ps=[(r,r['stats']['Points'],30) for r in self.records(range(40))]
   w=a.history_window(ps);self.assertGreater(w['evaluation_games'],0)
   # Held-out values cannot influence the selected window.
-  n=len(ps);cut=5+max(1,int((n-5)*.7))
+  n=len(ps);cut=25+max(1,int((n-25)*.7))
   changed=[(r,999999 if i>=cut else y,x) for i,(r,y,x) in enumerate(ps)]
   self.assertEqual(w['selected_games'],a.history_window(changed)['selected_games'])
  def test_log_loss_version_isolation(self):
@@ -56,3 +56,22 @@ class PipelineIntegration(unittest.TestCase):
   self.assertTrue(all('probability_range_80' in r for r in rows))
   self.assertTrue(all(r['engine_version']==a.VERSION for r in rows))
   self.assertTrue(all(r['side']=='Over' or r['line']==r['base_line'] for r in rows))
+
+class ScenarioTests(unittest.TestCase):
+ def test_weighted_price_and_sensitivity(self):
+  e={'draw_histograms':[{'0':1},{'2':1},{'2':1}],'scenario_weights':[.25,.5,.25]}
+  p=a.price(e,1,'Over',100)
+  self.assertEqual(p['probability'],.75)
+  self.assertEqual(p['probability_range_80'],[0,1])
+  self.assertEqual(p['expected_roi_pct'],50)
+  self.assertIsNone(p['probability_positive_ev'])
+ def test_count_distribution_moments(self):
+  for k,var in [(None,6),(6,12)]:
+   h=a.distribution('count',6,30,k,0)
+   mean=sum(float(y)*p for y,p in h.items())
+   self.assertAlmostEqual(mean,6,places=5)
+   self.assertAlmostEqual(sum((float(y)-mean)**2*p for y,p in h.items()),var,places=4)
+ def test_short_history_is_not_validation(self):
+  w=a.history_window([({},i,30) for i in range(8)])
+  self.assertEqual(w['selected_games'],8)
+  self.assertEqual(w['evaluation_games'],0)

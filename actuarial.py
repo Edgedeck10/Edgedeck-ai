@@ -1,12 +1,7 @@
-"""Empirical-Bayes/ Bayesian-bootstrap research engine. Standard library only.
-Posterior intervals are approximate and conditional on plug-in dispersion/peer fits.
-Not a full hierarchical Bayesian game model. No profitability guarantees.
-"""
-import math, random, statistics as st, hashlib
+"""Deterministic opportunity scenarios. Fitted distributions, not posterior inference."""
+import math, statistics as st
 from collections import defaultdict
-VERSION='opportunity-eb-1'
-DRAWS=48
-SIMS=32
+VERSION='opportunity-scenarios-1'
 COMBOS={'PRA':['Points','Rebounds','Assists'],'Points + rebounds':['Points','Rebounds'],'Points + assists':['Points','Assists'],'Rebounds + assists':['Rebounds','Assists']}
 def value(stats,market):
  if market in COMBOS:
@@ -16,7 +11,6 @@ def value(stats,market):
 def avg(a):return st.mean(a) if a else 0
 def quantile(a,p):
  a=sorted(a);i=(len(a)-1)*p;lo=int(i);return a[lo]+(a[min(lo+1,len(a)-1)]-a[lo])*(i-lo)
-def seed(key):return int(hashlib.sha256(str(key).encode()).hexdigest()[:16],16)
 def opportunity(sport,market):
  if sport in ('NBA','WNBA','NCAAB'):
   return ('Three attempts','finite') if market=='Threes' else ('Minutes','count')
@@ -54,8 +48,8 @@ def history_window(ps):
  """Tune windows on early chronological origins; evaluate on untouched later origins.
  This validates the rolling opportunity-mean forecaster, not the whole betting selector.
  """
- n=len(ps);candidates=[w for w in (5,10,15,20,25) if w<=n]
- origins=list(range(5,n));split=max(1,int(len(origins)*.7));train=origins[:split];hold=origins[split:]
+ n=len(ps);candidates=[w for w in (10,15,20,25) if w<=n]
+ origins=list(range(max(candidates,default=n),n));split=max(1,int(len(origins)*.7));train=origins[:split];hold=origins[split:]
  scores={}
  for w in candidates:
   errors=[]
@@ -69,14 +63,8 @@ def history_window(ps):
  for i in hold:
   p=ps[max(0,i-selected):i];mu=avg([x for _,y,x in p])*sum(y for _,y,x in p)/sum(x for _,y,x in p)
   errors.append(abs(ps[i][1]-mu))
- return {'selected_games':selected,'available_games':n,'candidate_mae':{str(k):round(v,3) if v is not None else None for k,v in scores.items()},'evaluation_games':len(hold),'holdout_mae':round(avg(errors),3) if errors else None,'scope':'Chronological opportunity-mean window comparison only; not full model or selection validation'}
+ return {'selected_games':selected,'available_games':n,'candidate_mae':{str(k):round(v,3) if v is not None else None for k,v in scores.items()},'evaluation_games':len(hold),'holdout_mae':round(avg(errors),3) if errors else None,'selection_status':'Chronological comparison' if eligible else 'Insufficient chronological origins; baseline window used','scope':'Chronological opportunity-mean window comparison only; not full model or selection validation'}
 
-def poisson(rng,mu):
- # Exact sum of independent Poisson chunks avoids exp underflow.
- if mu>40:return sum(poisson(rng,min(40,mu-i)) for i in range(0,int(math.ceil(mu)),40))
- limit=math.exp(-max(0,mu));p=1;k=0
- while p>limit:k+=1;p*=rng.random()
- return max(0,k-1)
 def fit(records,peers,sport,market,pid,key,adjustment=1):
  ps,unit,family=pairs_for(records,sport,market)
  fallback=False
@@ -94,44 +82,63 @@ def fit(records,peers,sport,market,pid,key,adjustment=1):
  excess=sum((y-m)**2-m for y,m in zip(ys,mus));den=sum(m*m for m in mus)
  k=den/excess if excess>0 and den>0 else None
  residual_sd=math.sqrt(avg([(y-shrunk*x)**2/max(x,1) for y,x in zip(ys,xs)]))
- rng=random.Random(seed(key));draws=[];all_outcomes=[]
- for d in range(DRAWS):
-  weights=[rng.expovariate(1) for _ in ps];total=sum(weights)
-  sample_rate=sum(w*y for w,y in zip(weights,ys))/sum(w*x for w,x in zip(weights,xs))
-  theta=(z*sample_rate+(1-z)*prior['baseline']) if prior else sample_rate
-  if family=='count':theta=rng.gammavariate(max(.0001,sum(ys)+(max(0,prior['baseline'])*prior['K'] if prior else .5)),1/(sum(xs)+(prior['K'] if prior else 0)))
-  if family=='finite':theta=rng.betavariate(.5+sum(ys),.5+sum(xs)-sum(ys))
-  outcomes=[]
-  for _ in range(SIMS):
-   workload=rng.choices(xs,weights=weights,k=1)[0]
-   if family=='finite':
-    attempts=max(0,round(workload));outcome=sum(rng.random()<min(1,max(0,theta*adjustment)) for _ in range(attempts))
-   elif family=='signed':outcome=round(rng.gauss(theta*workload*adjustment,residual_sd*math.sqrt(workload)))
-   else:
-    mu=max(0,theta*workload*adjustment);lam=rng.gammavariate(k,mu/k) if k and mu else mu;outcome=poisson(rng,lam)
-   outcomes.append(outcome)
-  draws.append(outcomes);all_outcomes+=outcomes
- histograms=[dict((str(y),outcomes.count(y)) for y in set(outcomes)) for outcomes in draws]
+ # One fitted family, evaluated at three workload scenarios. No Monte Carlo.
+ if family=='finite':shrunk=(sum(ys)+.5)/(sum(xs)+1)
+ elif family=='count' and not prior:shrunk=(sum(ys)+.5)/sum(xs)
+ workloads=[quantile(xs,.1),avg(xs),quantile(xs,.9)]
+ histograms=[distribution(family,shrunk*x*adjustment,x,k,residual_sd) for x in workloads]
+ mix=defaultdict(float)
+ for weight,h in zip((.25,.5,.25),histograms):
+  for y,p in h.items():mix[float(y)]+=weight*p
+ mean=sum(y*p for y,p in mix.items());sd=math.sqrt(sum((y-mean)**2*p for y,p in mix.items()))
+ def mq(q):
+  total=0
+  for y,p in sorted(mix.items()):
+   total+=p
+   if total>=q:return y
+  return max(mix)
  missing=['Confirmed lineup / role changes','Position-specific defense','Weather / game-script adjustment','Closing-line history']
  if sport in ('NBA','WNBA','NCAAB'):missing+=['Potential assists / rebound chances','On-off usage / pace']
  if sport in ('NFL','NCAAF'):missing+=['Routes / snap share / air yards / EPA','Individual-play severity data; yardage variance is aggregate approximation']
  if sport in ('EPL','MLS'):missing+=['xG / xA / possession']
  if sport=='NHL':missing+=['Power-play deployment / confirmed goalie']
- evidence={'engine':VERSION,'method':{'finite':'Beta-binomial production with Bayesian-bootstrap workload','signed':'Bayesian-bootstrap rate and workload; signed Gaussian aggregate-yardage approximation','count':'Approximate gamma rate / bootstrap workload; fitted negative-binomial production' if k else 'Gamma rate posterior / bootstrap workload; Poisson production'}[family], 'opportunity_unit':unit,'expected_opportunity':round(avg(xs),3),'observed_rate':round(rate,4),'shrunk_rate':round(shrunk,4),'credibility_weight':round(z,4),'credibility_fit':prior,'history_window':window,'adjustment':round(adjustment,4),'median':round(quantile(all_outcomes,.5),2),'outcome_range_80':[round(quantile(all_outcomes,.1),2),round(quantile(all_outcomes,.9),2)],'workload_range_80':[round(quantile(xs,.1),2),round(quantile(xs,.9),2)],'negative_binomial_k':round(k,4) if k else None,'fallback':fallback,'missing_inputs':missing,'status':'Research model; not prospectively validated','uncertainty_note':'Approximate conditional intervals: peer baseline and dispersion are fitted plug-in values. Not a full hierarchical Bayesian posterior; the gamma update is approximate when residual production is negative-binomial.','draw_histograms':histograms,'simulations_per_draw':SIMS,'sample_games':len(ps),'training_end':ps[-1][0]['start']}
- return {'projection':avg(all_outcomes),'sd':st.pstdev(all_outcomes),'evidence':evidence}
+ evidence={'engine':VERSION,'method':{'finite':'Binomial production','signed':'Rounded signed Gaussian yardage','count':'Negative-binomial production' if k else 'Poisson production'}[family]+' with low / normal / high workload scenarios', 'opportunity_unit':unit,'expected_opportunity':round(avg(xs),3),'observed_rate':round(rate,4),'shrunk_rate':round(shrunk,4),'credibility_weight':round(z,4),'credibility_fit':prior,'history_window':window,'adjustment':round(adjustment,4),'median':mq(.5),'outcome_range_80':[mq(.1),mq(.9)],'workload_range_80':[round(workloads[0],2),round(workloads[2],2)],'workload_scenarios':[{'label':label,'opportunity':round(x,3),'weight':w} for label,x,w in zip(('Low','Normal','High'),workloads,(.25,.5,.25))],'scenario_weights':[.25,.5,.25],'negative_binomial_k':round(k,4) if k else None,'fallback':fallback,'missing_inputs':missing,'status':'Research model; not prospectively validated','uncertainty_note':'Probability range is sensitivity to three workloads, not a credible interval. Scenario weights 25/50/25 are assumptions, not learned likelihoods. Parameter uncertainty and omitted matchup factors are not quantified.','draw_histograms':histograms,'simulations_per_draw':0,'sample_games':len(ps),'training_end':ps[-1][0]['start']}
+ return {'projection':mean,'sd':sd,'evidence':evidence}
+
+def distribution(family,mu,workload,k,residual_sd):
+ """Normalized discrete PMF; count tails truncated at 12 standard deviations."""
+ h={}
+ if family=='finite':
+  n=max(0,round(workload));p=min(1-1e-12,max(1e-12,mu/max(workload,1e-12)))
+  for y in range(n+1):h[str(y)]=math.exp(math.lgamma(n+1)-math.lgamma(y+1)-math.lgamma(n-y+1)+y*math.log(p)+(n-y)*math.log1p(-p))
+ elif family=='signed':
+  sd=residual_sd*math.sqrt(workload)
+  if sd<1e-9:return {str(round(mu)):1.}
+  cdf=lambda x:.5*(1+math.erf((x-mu)/(sd*math.sqrt(2))))
+  for y in range(math.floor(mu-9*sd),math.ceil(mu+9*sd)+1):h[str(y)]=max(0,cdf(y+.5)-cdf(y-.5))
+ else:
+  mu=max(0,mu)
+  if mu==0:return {'0':1.}
+  sd=math.sqrt(mu+(mu*mu/k if k else 0));upper=math.ceil(mu+12*sd+20)
+  for y in range(upper+1):
+   logp=(math.lgamma(y+k)-math.lgamma(k)-math.lgamma(y+1)+k*math.log(k/(k+mu))+y*math.log(mu/(k+mu))) if k else (-mu+y*math.log(mu)-math.lgamma(y+1))
+   h[str(y)]=math.exp(logp)
+ h={y:p for y,p in h.items() if p>1e-12};total=sum(h.values())
+ return {y:p/total for y,p in h.items()}
 
 def price(evidence,line,side,odds=None):
  draws=[];pushes=[]
  for histogram in evidence['draw_histograms']:
   total=sum(histogram.values());wins=sum(n for y,n in histogram.items() if (float(y)>line if side=='Over' else float(y)<line));push=sum(n for y,n in histogram.items() if float(y)==line)
   draws.append(wins/total);pushes.append(push/total)
- p=avg(draws);push=avg(pushes);loss=1-p-push;conditional=p/(p+loss) if p+loss else .5;conditional=min(.9999,max(.0001,conditional))
+ weights=evidence.get('scenario_weights',[1/len(draws)]*len(draws));weighted=lambda a:sum(w*v for w,v in zip(weights,a))
+ p=weighted(draws);push=weighted(pushes);loss=1-p-push;conditional=p/(p+loss) if p+loss else .5;conditional=min(.9999,max(.0001,conditional))
  fair=round(-100*conditional/(1-conditional)) if conditional>=.5 else round(100*(1-conditional)/conditional)
  evs=None
  if odds is not None and abs(odds)>=100:
   profit=100/abs(odds) if odds<0 else odds/100
   evs=[w*profit-(1-w-u) for w,u in zip(draws,pushes)]
- return {'probability':p,'push_probability':push,'probability_range_80':[quantile(draws,.1),quantile(draws,.9)],'fair_odds':fair,'expected_roi_pct':100*avg(evs) if evs is not None else None,'ev_lower_80_pct':100*quantile(evs,.1) if evs is not None else None,'probability_positive_ev':avg([v>0 for v in evs]) if evs is not None else None,'uncertainty_kind':'Conditional approximate parameter range plus finite simulation error'}
+ return {'probability':p,'push_probability':push,'probability_range_80':[min(draws),max(draws)],'fair_odds':fair,'expected_roi_pct':100*weighted(evs) if evs is not None else None,'ev_lower_80_pct':100*min(evs) if evs is not None else None,'probability_positive_ev':None,'positive_ev_scenario_weight':weighted([v>0 for v in evs]) if evs is not None else None,'uncertainty_kind':'Workload scenario sensitivity; not a posterior interval'}
 
 def monitoring(history,version):
  def scored_p(r):return min(1-1e-9,max(1e-9,r['probability']/max(1e-9,1-r.get('push_probability',0))))
