@@ -75,3 +75,34 @@ class ScenarioTests(unittest.TestCase):
   w=a.history_window([({},i,30) for i in range(8)])
   self.assertEqual(w['selected_games'],8)
   self.assertEqual(w['evaluation_games'],0)
+
+
+class MatchupTests(unittest.TestCase):
+ def test_opponent_index_has_no_future_leakage(self):
+  import matchup
+  events={};records={'p':[]}
+  for i in range(12):
+   date=f'2026-01-{i+1:02d}T00:00:00Z';eid=str(i)
+   events[eid]={'home':{'id':'h'},'away':{'id':'a'}}
+   records['p'].append({'start':date,'event_id':eid,'team_id':'h','stats':{'Minutes':30,'Points':20 if i<10 else 9999}})
+  index=matchup.Index(records,events,'NBA','Points')
+  rate,n=index.rate('a','2026-01-11T00:00:00Z')
+  self.assertEqual(n,10);self.assertAlmostEqual(rate,20/30)
+ def test_insufficient_matchup_is_neutral(self):
+  import matchup
+  matchup.CACHE.clear()
+  e={'start':'2026-02-01','home':{'id':'h'},'away':{'id':'a'}}
+  x=matchup.evaluate([],{}, {},e,'NBA','Points','h')
+  self.assertEqual(x['multiplier'],1);self.assertEqual(x['holdout_games'],0)
+ def test_missing_venue_is_not_assumed_away(self):
+  import matchup
+  matchup.CACHE.clear()
+  games=[{'start':f'2026-01-{i+1:02d}','event_id':str(i),'team_id':'h','stats':{'Minutes':30,'Points':20}} for i in range(12)]
+  x=matchup.evaluate(games,{'p':games},{},{'start':'2026-02-01','home':{'id':'h'},'away':{'id':'a'}},'NBA','Points','h')
+  self.assertEqual(x['venue_splits'],{})
+ def test_nhl_regulation_shots_not_overwritten(self):
+  import pipeline
+  e={'id':'NHL:1','start':'2026-01-01','sport':'NHL','source_url':'https://www.espn.com'}
+  d={'boxscore':{'players':[{'team':{'id':'h'},'statistics':[{'name':'forwards','labels':['S','TOI'],'athletes':[{'athlete':{'id':'p'},'stats':['4','18:30']}]},{'name':'shootout','labels':['SOG'],'athletes':[{'athlete':{'id':'p'},'stats':['0']}]}]}]}}
+  r=pipeline.parse_box(d,e)[0]
+  self.assertEqual(r['stats']['Shots on goal'],4)

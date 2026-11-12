@@ -1,7 +1,7 @@
 """Deterministic opportunity scenarios. Fitted distributions, not posterior inference."""
 import math, statistics as st
 from collections import defaultdict
-VERSION='opportunity-scenarios-1'
+VERSION='opportunity-context-2'
 COMBOS={'PRA':['Points','Rebounds','Assists'],'Points + rebounds':['Points','Rebounds'],'Points + assists':['Points','Assists'],'Rebounds + assists':['Rebounds','Assists']}
 def value(stats,market):
  if market in COMBOS:
@@ -78,7 +78,7 @@ def fit(records,peers,sport,market,pid,key,adjustment=1):
  z=sum(xs)/(sum(xs)+prior['K']) if prior else 1
  shrunk=z*rate+(1-z)*prior['baseline'] if prior else rate
  # Dispersion estimated from residuals conditional on opportunity, not raw variance.
- mus=[max(0,shrunk*x*adjustment) for x in xs]
+ mus=[max(0,shrunk*x) for x in xs]
  excess=sum((y-m)**2-m for y,m in zip(ys,mus));den=sum(m*m for m in mus)
  k=den/excess if excess>0 and den>0 else None
  residual_sd=math.sqrt(avg([(y-shrunk*x)**2/max(x,1) for y,x in zip(ys,xs)]))
@@ -149,3 +149,4 @@ def monitoring(history,version):
  for key,rows in groups.items():
   by[key[:2]].append({'brier':avg([(scored_p(r)-r['outcome'])**2 for r in rows]),'log_loss':avg([-math.log(max(1e-9,min(1-1e-9,scored_p(r) if r['outcome'] else 1-scored_p(r)))) for r in rows])})
  return [{'sport':s,'market':m,'forecast_groups':len(rs),'brier':avg([r['brier'] for r in rs]),'log_loss':avg([r['log_loss'] for r in rs])} for (s,m),rs in by.items()]
+

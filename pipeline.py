@@ -7,11 +7,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import defaultdict
 from zoneinfo import ZoneInfo
 import actuarial
+import matchup
 ROOT=pathlib.Path(__file__).parent; DATA=ROOT/'data'/'classic'; DATA.mkdir(parents=True,exist_ok=True)
 NOW=dt.datetime.now(dt.timezone.utc); TODAY=NOW.astimezone(ZoneInfo('America/Indiana/Indianapolis')).date()
 SPORTS={'NBA':'basketball/nba','NFL':'football/nfl','NHL':'hockey/nhl','MLB':'baseball/mlb','NCAAF':'football/college-football','NCAAB':'basketball/mens-college-basketball','WNBA':'basketball/wnba','EPL':'soccer/eng.1','MLS':'soccer/usa.1'}
 DEFAULTS={'NBA':(112,15),'NCAAB':(74,12),'WNBA':(81,12),'NFL':(23,10),'NCAAF':(28,15),'MLB':(4.5,3),'NHL':(3,1.8),'EPL':(1.4,1.3),'MLS':(1.5,1.4)}
-MODEL='opportunity-4.0.0'; ERRORS=[]; CAL_CACHE={}; PLAYER_LOGS={}
+MODEL='opportunity-4.1.0'; ERRORS=[]; CAL_CACHE={}; PLAYER_LOGS={}
 COMPRESSED={'latest.json','history.json','cache.json'}
 def read(n,d):
  packed=DATA/(n+'.gz')
@@ -96,6 +97,7 @@ def parse_box(d,e):
      if key and num(raw['YDS']) is not None:stats[key]=num(raw['YDS'])
     if 'TD' in raw and category in ('rushing','receiving'):stats['Touchdowns']=num(raw['TD']) or 0
     if 'C/ATT' in raw:stats['Completions']=num(str(raw['C/ATT']).split('/')[0]) or 0
+    if e['sport']=='NHL' and 'S' in raw and num(raw['S']) is not None:stats['Shots on goal']=num(raw['S'])
     if not stats:continue
     athlete=a.get('athlete',{});pid=str(athlete.get('id',''))
     rows.append({'player_id':pid,'player':athlete.get('displayName',''),'team_id':tid,'event_id':e['id'],'start':e['start'],'sport':e['sport'],'stats':stats,'source_url':next((z['href'] for z in athlete.get('links',[]) if z.get('href','').startswith('https://')),e['source_url'])})
@@ -105,7 +107,9 @@ def parse_box(d,e):
   key=r['player_id']
   if key not in merged:merged[key]=r
   else:
-   for k,v in r['stats'].items():merged[key]['stats'][k]=merged[key]['stats'].get(k,0)+v if k=='Touchdowns' else v
+   for k,v in r['stats'].items():
+    if r['sport']=='NHL' and k=='Shots on goal' and k in merged[key]['stats']:continue
+    merged[key]['stats'][k]=merged[key]['stats'].get(k,0)+v if k=='Touchdowns' else v
  return list(merged.values())
 def injury_rows(d,e):
  out=[]
@@ -257,7 +261,9 @@ def player_rows(events,e,box,injuries,history):
    if status.lower() not in ('not listed','active','available','probable'):flag.append(status)
    if expected_minutes and abs(mean(mins[-3:])-mean(mins))>4:flag.append('Minutes volatility');sig*=1.15
    if flag and status.lower() not in ('not listed','active','available','probable'):sig*=1.2
-   engine=actuarial.fit(games,records,e['sport'],market,pid,log_key,adjustment=1)
+   match=matchup.evaluate(games,records,events,e,e['sport'],market,latest['team_id'])
+   engine=actuarial.fit(games,records,e['sport'],market,pid,log_key,adjustment=match['multiplier'])
+   if engine:engine['evidence']['matchup_framework']=match
    if engine:
     projection=engine['projection'];sig=engine['sd'];rate=engine['evidence']['shrunk_rate'] if engine['evidence']['opportunity_unit']=='Minutes' else None;expected_minutes=engine['evidence']['expected_opportunity'] if engine['evidence']['opportunity_unit']=='Minutes' else None;PLAYER_LOGS[log_key]['model']=engine['evidence']
     defense=1 # Legacy ad-hoc defensive bonuses are not applied to this unvalidated engine.
@@ -275,7 +281,7 @@ def player_rows(events,e,box,injuries,history):
      if engine:
       estimates=actuarial.price(engine['evidence'],line,side,r.get('odds'));r.update(estimates);r['raw_probability']=r['probability'];r['calibration_games']=0
       r['engine_version']=actuarial.VERSION;r['model_status']='Research / unvalidated';r['qualified']=False
-      r['reasoning']=f"{engine['evidence']['expected_opportunity']} expected {engine['evidence']['opportunity_unit']} × {engine['evidence']['shrunk_rate']} production per opportunity. Posterior predictive mean {projection:.2f}; uncertainty includes workload scenarios. Opponent, lineup and weather adjustments are not available in this model."
+      r['reasoning']=f"{engine['evidence']['expected_opportunity']} expected {engine['evidence']['opportunity_unit']} × {engine['evidence']['shrunk_rate']} production per opportunity. Scenario-mixture mean {projection:.2f}. Opponent rate adjustment: {match['status']} (multiplier {match['multiplier']:.3f}). Confirmed lineup, position-specific defense and weather adjustments remain unavailable."
       r['selection_status']='Unpriced research' if r.get('odds') is None else 'Positive estimated value' if r['expected_roi_pct']>0 else 'Pass at this price'
      rows.append(r)
  return rows
@@ -351,14 +357,14 @@ def main():
   if e['sport'] not in ('NBA','WNBA','NFL','NHL','MLB','NCAAF','NCAAB'):continue
   for side in ('home','away'):
    for g in team_past(events,e,e[side]['id'])[-12:]:
-    if not box.get(g['id']) or cache['box_schema'].get(g['id'])!=3:needed[g['id']]=g
+    if not box.get(g['id']) or cache['box_schema'].get(g['id'])!=4:needed[g['id']]=g
  for r in history:
   if r.get('outcome') is None and r.get('player_id') and r['event_id'] in events and events[r['event_id']].get('final'):needed[r['event_id']]=events[r['event_id']]
  # Prioritize NBA player model on initial backfill, then other leagues. 180 max per run.
- target=sorted(needed.values(),key=lambda e:(e['sport']!='NBA',-iso(e['start']).timestamp()))[:180]
+ target=sorted(needed.values(),key=lambda e:(not(e['sport']=='NHL' and cache['box_schema'].get(e['id'])!=4),e['sport']!='NBA',-iso(e['start']).timestamp()))[:180]
  for key,d in parallel([(e['id'],summary,(e,)) for e in target]):
   rows=parse_box(d,events[key])
-  if rows:box[key]=rows;cache['box_schema'][key]=3
+  if rows:box[key]=rows;cache['box_schema'][key]=4
  write('cache.json',cache);write('events.json',events)
  # Pregame summaries supply fresh injury flags and fallback odds snapshots.
  injuries=[]
@@ -374,8 +380,10 @@ def main():
   if result is not None:
    r['outcome']=result;r['graded_at']=NOW.isoformat();r['profit_units']=0 if result=='push' else round(dec(r['odds'])-1 if result else -1,4) if r.get('odds') else None
  rows=[]
+ # Old hockey parser could confuse shootout SOG with regulation shots; do not model those boxes.
+ prediction_box={k:v for k,v in box.items() if not v or v[0]['sport']!='NHL' or cache['box_schema'].get(k)==4}
  for e in future:
-  rows+=team_rows(events,e,history);rows+=player_rows(events,e,box,injuries,history)
+  rows+=team_rows(events,e,history);rows+=player_rows(events,e,prediction_box,injuries,history)
  # Record one pregame forecast for each exact suggested line; never mutate it when refreshing.
  seen={r['id'] for r in history}
  for r in rows:
@@ -394,3 +402,4 @@ def main():
  write('events.json',events);write('history.json',history);write('latest.json',report);write('cache.json',cache)
  print(f'{len(future)} upcoming games | {len(rows)} lines | {sum(bool(r.get("player_id")) for r in rows)} player lines | {len(settled)} settled | {len(ERRORS)} feed errors')
 if __name__=='__main__':main()
+
