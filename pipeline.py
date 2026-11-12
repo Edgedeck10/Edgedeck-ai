@@ -205,7 +205,7 @@ def player_rows(events,e,box,injuries,history):
   status=inj.get(pid,{}).get('status','Not listed')
   if status.lower() in ('out','suspension','suspended','injured reserve'):continue
   recent=games[-20:];sid='home' if latest['team_id']==e['home']['id'] else 'away';mu_team,ctx=team_factors(events,e,sid)
-  mins=[x['stats']['Minutes'] for x in recent if x['stats'].get('Minutes',0)>0];expected_minutes=.65*mean(mins[-5:])+.35*mean(mins) if mins else None
+  mins=[x['stats']['Minutes'] for x in recent if (x['stats'].get('Minutes') or 0)>0];expected_minutes=.65*mean(mins[-5:])+.35*mean(mins) if mins else None
   if e['sport'] in ('NBA','WNBA','NCAAB') and (expected_minutes is None or expected_minutes<14):continue
   marketset=BASKET if e['sport'] in ('NBA','WNBA','NCAAB') else OTHER
   for market in marketset:
@@ -213,7 +213,7 @@ def player_rows(events,e,box,injuries,history):
    if len(pairs)<5:continue
    vals=[v for _,v in pairs];baseline=mean(vals);last5=mean(vals[-5:]);projection=.65*last5+.35*baseline
    rate=None
-   if expected_minutes and all(x['stats'].get('Minutes',0)>0 for x,_ in pairs):
+   if expected_minutes and all((x['stats'].get('Minutes') or 0)>0 for x,_ in pairs):
     rate=sum(v for x,v in pairs)/sum(x['stats']['Minutes'] for x,_ in pairs);projection=.6*(rate*expected_minutes)+.4*projection
    # Team points allowed is a limited proxy, do not use it for rebounds or assists.
    defense=1
