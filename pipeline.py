@@ -9,7 +9,7 @@ ROOT=pathlib.Path(__file__).parent; DATA=ROOT/'data'/'classic'; DATA.mkdir(paren
 NOW=dt.datetime.now(dt.timezone.utc); TODAY=NOW.astimezone(ZoneInfo('America/Indiana/Indianapolis')).date()
 SPORTS={'NBA':'basketball/nba','NFL':'football/nfl','NHL':'hockey/nhl','MLB':'baseball/mlb','NCAAF':'football/college-football','NCAAB':'basketball/mens-college-basketball','WNBA':'basketball/wnba','EPL':'soccer/eng.1','MLS':'soccer/usa.1'}
 DEFAULTS={'NBA':(112,15),'NCAAB':(74,12),'WNBA':(81,12),'NFL':(23,10),'NCAAF':(28,15),'MLB':(4.5,3),'NHL':(3,1.8),'EPL':(1.4,1.3),'MLS':(1.5,1.4)}
-MODEL='classic-2.0.0'; ERRORS=[]; CAL_CACHE={}
+MODEL='classic-2.0.0'; ERRORS=[]; CAL_CACHE={}; PLAYER_LOGS={}
 def read(n,d):
  try:return json.loads((DATA/n).read_text())
  except (ValueError,OSError):return d
@@ -211,6 +211,16 @@ def player_rows(events,e,box,injuries,history):
   for market in marketset:
    pairs=[(x,expanded(x['stats']).get(market)) for x in recent];pairs=[(x,v) for x,v in pairs if v is not None]
    if len(pairs)<5:continue
+   log_key=e['id']+':'+pid+':'+market
+   log_games=[]
+   for x in games[-25:]:
+    value=expanded(x['stats']).get(market)
+    if value is None:continue
+    past=events.get(x['event_id'],{});home=past.get('home',{});away=past.get('away',{})
+    venue='home' if home.get('id')==x['team_id'] else 'away'
+    opponent=away if venue=='home' else home
+    log_games.append({'date':x['start'],'value':value,'opponent':opponent.get('abbr') or opponent.get('name','Unknown'),'opponent_id':opponent.get('id'),'venue':venue})
+   PLAYER_LOGS[log_key]={'games':log_games,'next_opponent_id':e['away' if sid=='home' else 'home']['id']}
    vals=[v for _,v in pairs];baseline=mean(vals);last5=mean(vals[-5:]);projection=.65*last5+.35*baseline
    rate=None
    if expected_minutes and all((x['stats'].get('Minutes') or 0)>0 for x,_ in pairs):
@@ -236,7 +246,7 @@ def player_rows(events,e,box,injuries,history):
      for hit in reversed(hits):
       if not hit:break
       streak+=1
-     r=make_row(e,market,side,line,projection,sig,history,player_id=pid,player=latest['player'],selection=latest['player'],team_id=latest['team_id'],sample=len(vals),flags=list(flag),source_url=latest['source_url'],injury_status=status,baseline=round(baseline,2),last5=round(last5,2),trend_pct=round((last5/baseline-1)*100,1) if baseline else 0,hit_rate=round(mean(hits),4),last5_hits=sum(hits[-5:]),last10_hits=sum(hits[-10:]),streak=streak,recent_values=vals[-10:],projected_minutes=round(expected_minutes,1) if expected_minutes else None,per_minute=round(rate,3) if rate is not None else None,context={**ctx,'venue':sid,'defense_multiplier':round(defense,3),'teammate_absences':[z['player'] for z in injuries if z['event_id']==e['id'] and z['team_id']==latest['team_id'] and z['status'].lower()=='out']},reasoning='Recent 5 + available season-window form, minutes × per-minute production where available, basketball rest adjustment. Points use opponent team points allowed. Teammate absences flagged; usage redistribution and position-specific defense are not yet modeled.')
+     r=make_row(e,market,side,line,projection,sig,history,player_id=pid,player=latest['player'],selection=latest['player'],team_id=latest['team_id'],sample=len(vals),log_key=log_key,flags=list(flag),source_url=latest['source_url'],injury_status=status,baseline=round(baseline,2),last5=round(last5,2),trend_pct=round((last5/baseline-1)*100,1) if baseline else 0,hit_rate=round(mean(hits),4),last5_hits=sum(hits[-5:]),last10_hits=sum(hits[-10:]),streak=streak,recent_values=vals[-10:],projected_minutes=round(expected_minutes,1) if expected_minutes else None,per_minute=round(rate,3) if rate is not None else None,context={**ctx,'venue':sid,'defense_multiplier':round(defense,3),'teammate_absences':[z['player'] for z in injuries if z['event_id']==e['id'] and z['team_id']==latest['team_id'] and z['status'].lower()=='out']},reasoning='Recent 5 + available season-window form, minutes × per-minute production where available, basketball rest adjustment. Points use opponent team points allowed. Teammate absences flagged; usage redistribution and position-specific defense are not yet modeled.')
      rows.append(r)
  return rows
 
@@ -349,7 +359,7 @@ def main():
  bins=[]
  for lo in (0,.5,.6,.7,.8,.9):
   hi=.5 if lo==0 else lo+.1;rs=[r for r in settled if lo<=r['probability']<hi];bins.append({'from':lo,'to':round(hi,2),'n':len(rs),'predicted':mean([r['probability'] for r in rs],None),'actual':mean([r['outcome'] for r in rs],None)})
- report={'version':MODEL,'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'refresh_minutes':15,'recommendations':rows,'games':future,'injuries':injuries,'metrics':{'tracked_predictions':len(history),'settled_predictions':len(settled),'won':sum(r['outcome'] for r in settled),'brier_score':round(brier,4) if brier is not None else None,'independent_groups':len(groups),'priced_settled':len(priced),'realized_roi_pct':round(100*sum(r['profit_units'] for r in priced)/len(priced),2) if priced else None},'calibration_bins':bins,'coverage':list(SPORTS),'source':'ESPN public scoreboards / boxscores / injury reports; DraftKings game odds where supplied by ESPN','errors':ERRORS,'backfill_remaining':max(0,len(needed)-len(target)),'limitations':['Player-prop prices are not provided by the free game feed. Suggested lines are model thresholds, not sportsbook offers.','Normal-distribution model estimates are provisional, especially for rare events. No 90% estimate is validated yet.','Injury status and teammate absences are flags; confirmed rotations, player usage redistribution and position-specific defense are not modeled.','No automatic odds feeds for golf, tennis or UFC; exact markets can be imported locally.','Missing player participation remains pending for review, never automatically graded as a loss.']}
+ report={'player_logs':PLAYER_LOGS,'version':MODEL,'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'refresh_minutes':15,'recommendations':rows,'games':future,'injuries':injuries,'metrics':{'tracked_predictions':len(history),'settled_predictions':len(settled),'won':sum(r['outcome'] for r in settled),'brier_score':round(brier,4) if brier is not None else None,'independent_groups':len(groups),'priced_settled':len(priced),'realized_roi_pct':round(100*sum(r['profit_units'] for r in priced)/len(priced),2) if priced else None},'calibration_bins':bins,'coverage':list(SPORTS),'source':'ESPN public scoreboards / boxscores / injury reports; DraftKings game odds where supplied by ESPN','errors':ERRORS,'backfill_remaining':max(0,len(needed)-len(target)),'limitations':['Player-prop prices are not provided by the free game feed. Suggested lines are model thresholds, not sportsbook offers.','Normal-distribution model estimates are provisional, especially for rare events. No 90% estimate is validated yet.','Injury status and teammate absences are flags; confirmed rotations, player usage redistribution and position-specific defense are not modeled.','No automatic odds feeds for golf, tennis or UFC; exact markets can be imported locally.','Missing player participation remains pending for review, never automatically graded as a loss.']}
  # No destructive retention of forecast history. Cache excludes bulky raw feed payloads.
  write('events.json',events);write('history.json',history);write('latest.json',report);write('cache.json',cache)
  print(f'{len(future)} upcoming games | {len(rows)} lines | {sum(bool(r.get("player_id")) for r in rows)} player lines | {len(settled)} settled | {len(ERRORS)} feed errors')
