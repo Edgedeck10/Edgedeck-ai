@@ -64,6 +64,21 @@ def summarize(ledger):
  for r in ledger:markets[(r['sport'],r['market'])].append(r)
  for (sport,market),rs in markets.items():
   x=summary(sport+' · '+market,rs);loss=[r for r in rs if r.get('outcome')==0];x['high_confidence_misses']=sum(r['probability']>=.7 for r in loss);x['flagged_misses']=sum(bool(r.get('flags')) for r in loss);x['interpretation']='Review calibration, workload and missing inputs; losses alone do not identify their cause.';diagnostics.append(x)
- return {'records':records,'market_diagnostics':diagnostics,'bundles':bundles,'scope':'First published AI top picks per game, prospectively frozen. Not all alternate thresholds or user tickets. No retrospective top-pick reconstruction.'}
+ trend_groups=defaultdict(list)
+ for r in ledger:
+  rank=r.get('ai_rank')
+  odds=r.get('odds')
+  band='Unpriced' if odds is None else ('−151 or shorter' if odds<-150 else '−150 to −101' if odds<-100 else 'Even to +149' if odds<150 else '+150 or longer')
+  tier='Ranks 1–5' if isinstance(rank,int) and 1<=rank<=5 else 'Ranks 6–10' if isinstance(rank,int) and 6<=rank<=10 else 'Rank unavailable'
+  for scope in ('Overall',GROUPS.get(r['sport'],r['sport'])):
+   trend_groups[(scope,tier)].append(r)
+   trend_groups[(scope,band)].append(r)
+ trends=[]
+ for (scope,band),rs in sorted(trend_groups.items()):
+  item=summary(scope,rs)
+  prices=[r['odds'] for r in rs if r.get('odds') is not None and r.get('outcome') in (0,1,'push')]
+  item.update(band=band,average_decimal_odds=mean([1+100/-o if o<0 else 1+o/100 for o in prices]),priced_settled=len(prices),roi_pct=100*item['profit_units']/len(prices) if prices else None)
+  trends.append(item)
+ return {'trends':trends,'records':records,'market_diagnostics':diagnostics,'bundles':bundles,'scope':'First published AI top picks per game, prospectively frozen. Not all alternate thresholds or user tickets. No retrospective top-pick reconstruction.'}
 
 

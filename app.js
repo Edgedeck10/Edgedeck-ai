@@ -176,7 +176,7 @@ function ticketPayoutForm(rows){return `<div><h4>Ticket payout calculator</h4><l
 document.addEventListener('input',e=>{if(!e.target.matches('[data-ticket-odds],[data-ticket-stake]'))return;const host=$('combined'),o=Number(host.querySelector('[data-ticket-odds]').value),stake=Number(host.querySelector('[data-ticket-stake]').value);host.querySelector('[data-ticket-payout]').textContent=Math.abs(o)>=100&&Number.isFinite(stake)&&stake>=0?`If won: $${(stake*(decimal(o)-1)).toFixed(2)} profit / $${(stake*decimal(o)).toFixed(2)} total return at your entered quote. No ticket win probability or edge is established.`:'Enter valid American odds (−100 or lower, +100 or higher) and a nonnegative stake.'});
 
 
-function renderAiRecord(){const target=$('aiRecord');if(!target)return;const a=report.ai_record||{},rows=a.records||[],diag=a.market_diagnostics||[],learning=Object.entries(report.ai_learning||{});target.innerHTML=`<h3>AI picks: sport &amp; overall record</h3><p class="small">${esc(a.scope||'Tracking starts with the first published selection snapshot.')} Pushes excluded from win %. ROI uses observed-price straight bets only. Alternatives and personal tickets are separate.</p><div style="overflow-x:auto"><table><thead><tr><th>Sport</th><th>W–L–P</th><th>Win %</th><th>Pending</th><th>Games</th><th>Priced ROI</th><th>Brier</th></tr></thead><tbody>${rows.map(r=>`<tr><td><b>${esc(r.sport)}</b></td><td>${r.wins}–${r.losses}–${r.pushes}</td><td>${pct(r.hit_rate)}</td><td>${r.pending}</td><td>${r.games}</td><td>${r.roi_pct==null?'Unpriced':fmt(r.roi_pct)+'% ('+r.priced_settled+')'}</td><td>${r.brier==null?'—':Number(r.brier).toFixed(3)}</td></tr>`).join('')}</tbody></table></div><p class="small">Compare sample sizes and pricing, not hit rate alone. These records do not establish which sport will perform best in future.</p><details><summary>Miss review &amp; learning by sport / market</summary>${diag.map(r=>`<p><b>${esc(r.sport)}</b>: ${r.wins}–${r.losses}; MAE ${fmt(r.mae)}, signed error ${fmt(r.projection_bias)}, Brier ${fmt(r.brier)}. High-confidence misses ${r.high_confidence_misses}; flagged misses ${r.flagged_misses}. ${esc(r.interpretation)}</p>`).join('')}${learning.length?learning.map(([k,v])=>`<p>${esc(k)}: ${esc(v.status)} · ${v.samples} graded picks across ${v.game_dates} dates · correction ${fmt(v.conditional_probability_offset*100)} pp. ${esc(v.scope)}</p>`).join(''):'<p>No graded AI selections yet; no learned correction is active.</p>'}<p class="small">Only future predictions may change. A small sport/market probability-bias correction activates after at least 30 graded picks across 10 dates and improved later-date Brier score. It is not a causal explanation or a guarantee of improved future accuracy. Projection errors use different units; compare within each market.</p></details><details><summary>Per-game all-picks bundle record</summary><p class="small">Research bundle of every frozen pick, not a user-created or sportsbook-priced parlay. One loss loses the bundle; unresolved legs remain pending unless already lost; pushes remove legs. No parlay ROI inferred.</p>${(a.bundles||[]).map(b=>`<p>${esc(b.sport)} · ${esc(b.event)} · ${b.legs} picks · <b>${b.outcome===0?'Loss':b.outcome===1?'Win':b.outcome==='push'?'Push':'Pending'}</b></p>`).join('')}</details><details><summary>Latest graded AI picks</summary>${(report.ai_recent_results||[]).slice().reverse().map(r=>`<p>${esc(r.sport+' · '+r.event+' · '+r.selection+' · '+r.market)} ${esc(r.side)} ${fmt(r.line)} · ${r.outcome===1?'Win':r.outcome===0?'Loss':'Push'} · forecast ${fmt(r.projection)}, actual ${fmt(r.actual_value)} · ${pct(r.probability)} predicted</p>`).join('')||'<p>Pending games have not been graded yet.</p>'}</details>`}
+function renderAiRecord(){const target=$('aiRecord');if(!target)return;const a=report.ai_record||{},rows=a.records||[],diag=a.market_diagnostics||[],learning=Object.entries(report.ai_learning||{});target.innerHTML=`<h3>AI picks: sport &amp; overall record</h3><p class="small">${esc(a.scope||'Tracking starts with the first published selection snapshot.')} Pushes excluded from win %. ROI uses observed-price straight bets only. Alternatives and personal tickets are separate.</p><div style="overflow-x:auto"><table><thead><tr><th>Sport</th><th>W–L–P</th><th>Win %</th><th>Pending</th><th>Games</th><th>Priced ROI</th><th>Brier</th></tr></thead><tbody>${rows.map(r=>`<tr><td><b>${esc(r.sport)}</b></td><td>${r.wins}–${r.losses}–${r.pushes}</td><td>${pct(r.hit_rate)}</td><td>${r.pending}</td><td>${r.games}</td><td>${r.roi_pct==null?'Unpriced':fmt(r.roi_pct)+'% ('+r.priced_settled+')'}</td><td>${r.brier==null?'—':Number(r.brier).toFixed(3)}</td></tr>`).join('')}</tbody></table></div><p class="small">Compare sample sizes and pricing, not hit rate alone. These records do not establish which sport will perform best in future.</p>${trendPanel(a.trends||[])}<details><summary>Miss review &amp; learning by sport / market</summary>${diag.map(r=>`<p><b>${esc(r.sport)}</b>: ${r.wins}–${r.losses}; MAE ${fmt(r.mae)}, signed error ${fmt(r.projection_bias)}, Brier ${fmt(r.brier)}. High-confidence misses ${r.high_confidence_misses}; flagged misses ${r.flagged_misses}. ${esc(r.interpretation)}</p>`).join('')}${learning.length?learning.map(([k,v])=>`<p>${esc(k)}: ${esc(v.status)} · ${v.samples} graded picks across ${v.game_dates} dates · correction ${fmt(v.conditional_probability_offset*100)} pp. ${esc(v.scope)}</p>`).join(''):'<p>No graded AI selections yet; no learned correction is active.</p>'}<p class="small">Only future predictions may change. A small sport/market probability-bias correction activates after at least 30 graded picks across 10 dates and improved later-date Brier score. It is not a causal explanation or a guarantee of improved future accuracy. Projection errors use different units; compare within each market.</p></details><details><summary>Per-game all-picks bundle record</summary><p class="small">Research bundle of every frozen pick, not a user-created or sportsbook-priced parlay. One loss loses the bundle; unresolved legs remain pending unless already lost; pushes remove legs. No parlay ROI inferred.</p>${(a.bundles||[]).map(b=>`<p>${esc(b.sport)} · ${esc(b.event)} · ${b.legs} picks · <b>${b.outcome===0?'Loss':b.outcome===1?'Win':b.outcome==='push'?'Push':'Pending'}</b></p>`).join('')}</details><details><summary>Latest graded AI picks</summary>${(report.ai_recent_results||[]).slice().reverse().map(r=>`<p>${esc(r.sport+' · '+r.event+' · '+r.selection+' · '+r.market)} ${esc(r.side)} ${fmt(r.line)} · ${r.outcome===1?'Win':r.outcome===0?'Loss':'Push'} · forecast ${fmt(r.projection)}, actual ${fmt(r.actual_value)} · ${pct(r.probability)} predicted</p>`).join('')||'<p>Pending games have not been graded yet.</p>'}</details>`}
 
 
 
@@ -255,8 +255,43 @@ document.addEventListener('click',e=>{
  result.innerHTML=`<p>${original==null?'Enter main-line odds to compare expected returns.':`Main-line estimated return ${pct(original)}.`} ${best?`Selected Over ${fmt(best.o.line)} for this ticket.`:'No lower line qualified at the supplied prices.'}</p>`+
  comparisons.map(({o,gain,ev})=>`<p>Over ${fmt(o.line)} · ${gain>=0?'+':''}${fmt(gain*100)} pp · ${ev==null?'estimated break-even '+odd(o.price):'estimated return '+pct(ev)}</p>`).join('');
  if(best){
+  result.insertAdjacentText('beforeend',saveLinePair(r,main,mainQuote,best.o,buydownQuotes.get(best.o.id)));
   const select=panel.closest('.game-pick').querySelector('[data-game-option]');
   select.value=best.o.id;
   select.dispatchEvent(new Event('change',{bubbles:true}));
  }
 });
+
+const linePairKey='edgedeck-line-pairs-v1';
+function readLinePairs(){
+ try{const rows=JSON.parse(localStorage.getItem(linePairKey)||'[]');return Array.isArray(rows)?rows:[]}catch{return []}
+}
+function linePairId(r){return JSON.stringify([r.event_id,r.player_id,r.market])}
+function saveLinePair(r,main,mainQuote,alt,altQuote){
+ if(!Number.isFinite(Date.parse(r.start))||Date.parse(r.start)<=Date.now())return ' Pregame tracking has closed.';
+ const rows=readLinePairs(),id=linePairId(r);
+ if(rows.some(x=>x.id===id))return ' First qualifying comparison already tracked on this device.';
+ const snapshot=(o,odds)=>({line:o.line,odds,probability:o.probability});
+ rows.push({id,enteredAt:new Date().toISOString(),main:snapshot(main,mainQuote),alt:snapshot(alt,altQuote)});
+ try{localStorage.setItem(linePairKey,JSON.stringify(rows));return ' Pregame comparison saved on this device.'}catch{return ' Device storage was unavailable.'}
+}
+function trendPanel(trends){
+ const pairs=readLinePairs(),actuals=new Map();
+ if(pairs.length)for(const r of history)if(Number.isFinite(r.actual_value))actuals.set(linePairId(r),r.actual_value);
+ const paired=pairs.filter(p=>actuals.has(p.id));
+ const sides=['main','alt'].map(side=>{
+  let wins=0,losses=0,profit=0,oddsSum=0;
+  for(const p of paired){
+   const {line,odds}=p[side],actual=actuals.get(p.id);
+   oddsSum+=decimal(odds);
+   if(actual>line){wins++;profit+=decimal(odds)-1}
+   if(actual<line){losses++;profit--}
+  }
+  return [side==='main'?'Main':'Lower',wins+'–'+losses+'–'+(paired.length-wins-losses),wins+losses?pct(wins/(wins+losses)):'—',paired.length?(oddsSum/paired.length).toFixed(2):'—',paired.length?pct(profit/paired.length):'—'];
+ });
+ const table=(headers,rows)=>'<div style="overflow-x:auto"><table><thead><tr>'+headers.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+row.map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
+ return '<details><summary>Performance by rank, sport and odds</summary><p class="small">ROI uses settled picks with recorded prices at one unit each. Average odds are decimal.</p>'+
+ table(['Sport','Group','W–L–P','Win %','Priced','Avg odds','ROI'],trends.map(r=>[r.sport,r.band,r.wins+'–'+r.losses+'–'+r.pushes,pct(r.hit_rate),r.priced_settled,r.average_decimal_odds?.toFixed(2)??'—',r.roi_pct==null?'—':fmt(r.roi_pct)+'%']))+'</details>'+
+ '<details><summary>Main vs. lower line results</summary><p class="small">Compare prices saves the first qualifying pair before game start on this device. Both lines use the same final stat and their recorded quotes. '+paired.length+' graded · '+(pairs.length-paired.length)+' awaiting final stats.</p>'+
+ table(['Line','W–L–P','Win %','Avg odds','ROI'],sides)+'</details>';
+}
