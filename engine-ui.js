@@ -28,7 +28,7 @@ function matchupPanel(m){const x=m.matchup_framework;if(!x)return '';return `<di
 
 
 function projectionPanel(r){
- const e=r.projection_evidence,m=engineFor(r);let body='';
+ const e=r.projection_evidence||report.game_evidence?.[r.projection_evidence_ref||r.event_id],m=engineFor(r);let body='';
  const n=v=>Number.isFinite(v)?Number(v).toFixed(2):'—';
  if(e?.kind==='team'){
   const team=t=>`<h4>${esc(t.team_name)}</h4><p>Scoring: ${n(t.scoring_average)} per game (${t.scoring_games} games${t.fallback_scoring?'; league default used':''}). Opponent ${esc(t.opponent_name)} allows ${n(t.opponent_allowed_average)} (${t.opponent_defense_games} games${t.fallback_defense?'; league default used':''}).<br><b>(${n(t.scoring_average)} + ${n(t.opponent_allowed_average)}) ÷ 2 = ${n(t.blend)}</b><br>Rest: ${n(t.rest_adjustment)} · venue: ${n(t.venue_adjustment)} → <b>${n(t.projected_score)} projected points</b>.</p>`;
@@ -39,4 +39,5 @@ function projectionPanel(r){
  let comparison='';if(r.line!=null&&r.market!=='Spread')comparison=`<p><b>Projection ${n(r.projection)} versus ${r.odds==null?'model reference':'observed sportsbook'} line ${n(r.line)}: ${n(r.projection-r.line)} difference</b>. Direction: ${esc(r.side)}.</p>`;
  return `<details class="view-guide"><summary>How this projection was calculated</summary>${comparison}${body}<p><b>Price check:</b> ${r.odds==null?'No actual sportsbook quote is attached; this projection difference alone does not establish value.':`${odd(r.odds)} requires ${pct(implied(r.odds))} wins without pushes. Model win estimate ${pct(r.probability)}, push ${pct(r.push_probability||0)}, estimated return ${fmt(r.expected_roi_pct)}%.`}</p><p class="small">The win probability uses the outcome distribution, not the projection difference alone. ${r.player_id?'Unmodeled factors are listed in the opportunity evidence panel.':'Game probabilities use the legacy normal-margin/total approximation and any recorded calibration adjustment.'}</p></details>`;
 }
+
 

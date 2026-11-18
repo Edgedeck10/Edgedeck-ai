@@ -27,3 +27,27 @@ class PipelineTest(unittest.TestCase):
   result,n=p.calibrate([h],h['calibration_key'],.6);self.assertGreater(result,.6);self.assertEqual(n,1)
  def test_schedule_score_objects(self):self.assertEqual(p.num({'value':117}),117)
 if __name__=='__main__':unittest.main()
+
+
+class RefreshRegression(unittest.TestCase):
+ def test_new_day_schedules_complete_main(self):
+  from unittest.mock import patch
+  import contextlib,io
+  future={'id':'NFL:next','espn_id':'next','sport':'NFL','event':'Away at Home','start':(p.NOW+dt.timedelta(hours=3)).isoformat(),'day':p.TODAY.isoformat(),'home':{'id':'h','name':'Home','periods':[],'stats':{}},'away':{'id':'a','name':'Away','periods':[],'stats':{}},'final':False,'state':'pre','source_url':'https://www.espn.com','odds':[]}
+  raw={'id':'past','name':'Away at Home','date':(p.NOW-dt.timedelta(days=7)).isoformat(),'competitions':[{'competitors':[{'homeAway':'home','team':{'id':'h','displayName':'Home'},'score':'28'},{'homeAway':'away','team':{'id':'a','displayName':'Away'},'score':'21'}],'status':{'type':{'completed':True,'state':'post'}}}]}
+  saved={}
+  with patch.object(p,'read',side_effect=lambda n,d:d),patch.object(p,'write',side_effect=lambda n,v:saved.update({n:v})),patch.object(p,'scoreboard',side_effect=lambda sport,day:[future] if sport=='NFL' and day==p.TODAY.isoformat() else []),patch.object(p,'schedule',return_value={'events':[raw]}),patch.object(p,'summary',return_value={}),contextlib.redirect_stdout(io.StringIO()):p.main()
+  self.assertIn('NFL:past',saved['events.json'])
+  self.assertIn('status.json',saved)
+  self.assertGreater(len(saved['latest.json']['recommendations']),0)
+  self.assertEqual(saved['latest.json']['transport_version'],2)
+ def test_compact_transport_preserves_predictions_and_archives(self):
+  import feed_transport as f
+  model={'draw_histograms':[{'0':.25,'2':.75}]};r={'id':'r','event_id':'e','player_id':'p','probability':.75,'context':{'source_games':[1]*100,'venue':'home'}}
+  source={'recommendations':[r],'player_logs':{'a':{'model':model},'b':{'model':model}},'ai_selections':{}}
+  compact=f.compact(source)
+  self.assertEqual(len(compact['distributions']),1)
+  self.assertEqual(compact['recommendations'][0]['probability'],.75)
+  self.assertNotIn('source_games',compact['recommendations'][0]['context'])
+  self.assertEqual(len(r['context']['source_games']),100)
+  self.assertEqual(f.history_view([r])[0]['probability'],.75)

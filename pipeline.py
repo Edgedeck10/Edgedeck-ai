@@ -9,12 +9,13 @@ from zoneinfo import ZoneInfo
 import actuarial
 import matchup
 import ai_record
+import feed_transport
 ROOT=pathlib.Path(__file__).parent; DATA=ROOT/'data'/'classic'; DATA.mkdir(parents=True,exist_ok=True)
 NOW=dt.datetime.now(dt.timezone.utc); TODAY=NOW.astimezone(ZoneInfo('America/Indiana/Indianapolis')).date()
 SPORTS={'NBA':'basketball/nba','NFL':'football/nfl','NHL':'hockey/nhl','MLB':'baseball/mlb','NCAAF':'football/college-football','NCAAB':'basketball/mens-college-basketball','WNBA':'basketball/wnba','EPL':'soccer/eng.1','MLS':'soccer/usa.1'}
 DEFAULTS={'NBA':(112,15),'NCAAB':(74,12),'WNBA':(81,12),'NFL':(23,10),'NCAAF':(28,15),'MLB':(4.5,3),'NHL':(3,1.8),'EPL':(1.4,1.3),'MLS':(1.5,1.4)}
 MODEL='opportunity-4.2.0'; ERRORS=[]; CAL_CACHE={}; PLAYER_LOGS={}
-COMPRESSED={'latest.json','history.json','cache.json','ai_picks.json'}
+COMPRESSED={'latest.json','history.json','cache.json','ai_picks.json','history-view.json'}
 def read(n,d):
  packed=DATA/(n+'.gz')
  if packed.exists():
@@ -342,9 +343,9 @@ def main():
  pending={(r['sport'],iso(r.get('start')).date().isoformat()) for r in history if r.get('outcome') is None and iso(r.get('start'))<NOW-dt.timedelta(days=1) and r['sport'] in SPORTS}
  for _,gs in parallel([(f'pending:{s}:{d}',scoreboard,(s,d)) for s,d in pending]):
   for e in gs:events[e['id']]=e
- future=sorted([e for e in events.values() if not e.get('final') and e.get('state')=='pre' and NOW<iso(e['start'])<NOW+dt.timedelta(days=6)],key=lambda e:e['start'])[:180]
+ future=sorted([e for e in events.values() if not e.get('final') and e.get('state')=='pre' and NOW<iso(e['start'])<NOW+dt.timedelta(days=6 if e['sport'] in ('NFL','NCAAF') else 2)],key=lambda e:e['start'])
  # Cache past team schedules daily; bootstrap real season-window samples.
- teams={(e['sport'],e[s]['id']) for e in future for s in ('home','away') if e['sport'] not in ('EPL','MLS')}
+ teams={(e['sport'],e[s]['id']) for e in future for s in ('home','away') }
  jobs=[]
  for sport,tid in teams:
   key=sport+':'+tid
@@ -371,14 +372,20 @@ def main():
  # Backfill a bounded set of final boxscores; completed boxes retained, recent missing boxes retried.
  needed={}
  for e in future:
-  if e['sport'] not in ('NBA','WNBA','NFL','NHL','MLB','NCAAF','NCAAB'):continue
+  if e['sport'] not in tuple(SPORTS):continue
   for side in ('home','away'):
    for g in team_past(events,e,e[side]['id'])[-12:]:
     if not box.get(g['id']) or cache['box_schema'].get(g['id'])!=4:needed[g['id']]=g
  for r in history:
   if r.get('outcome') is None and r.get('player_id') and r['event_id'] in events and events[r['event_id']].get('final'):needed[r['event_id']]=events[r['event_id']]
  # Prioritize NBA player model on initial backfill, then other leagues. 180 max per run.
- target=sorted(needed.values(),key=lambda e:(not(e['sport']=='NHL' and cache['box_schema'].get(e['id'])!=4),e['sport']!='NBA',-iso(e['start']).timestamp()))[:180]
+ queues=defaultdict(list)
+ for fixture in sorted(needed.values(),key=lambda e:-iso(e['start']).timestamp()):queues[fixture['sport']].append(fixture)
+ target=[]
+ while queues and len(target)<180:
+  for sport in list(queues):
+   if len(target)<180:target.append(queues[sport].pop(0))
+   if not queues[sport]:del queues[sport]
  for key,d in parallel([(e['id'],summary,(e,)) for e in target]):
   rows=parse_box(d,events[key])
   if rows:box[key]=rows;cache['box_schema'][key]=4
@@ -404,11 +411,11 @@ def main():
  learning=ai_record.calibration(ai_ledger,NOW.isoformat())
  for row in rows:ai_record.apply(row,learning)
  frozen_events={r['event_id'] for r in ai_ledger}
- for event in future:
-  prior=[r for r in ai_ledger if r['event_id']==event['id']]
+ for fixture in future:
+  prior=[r for r in ai_ledger if r['event_id']==fixture['id']]
   if len(prior)>=10:continue
   prior_keys={('player',r['player_id']) if r.get('player_id') else ('market',r['market'],r.get('team_id','game')) for r in prior}
-  chosen=ai_record.choose([r for r in rows if r['event_id']==event['id']])
+  chosen=ai_record.choose([r for r in rows if r['event_id']==fixture['id']])
   chosen=[r for r in chosen if (('player',r['player_id']) if r.get('player_id') else ('market',r['market'],r.get('team_id','game'))) not in prior_keys][:10-len(prior)]
   for rank,r in enumerate(chosen,len(prior)+1):
    snapshot={k:v for k,v in r.items() if k not in ('context','recent_values')}
@@ -433,10 +440,17 @@ def main():
  for lo in (0,.5,.6,.7,.8,.9):
   hi=.5 if lo==0 else lo+.1;rs=[r for r in settled if lo<=r['probability']<hi];bins.append({'from':lo,'to':round(hi,2),'n':len(rs),'predicted':mean([r['probability'] for r in rs],None),'actual':mean([r['outcome'] for r in rs],None)})
  report={'ai_selections':ai_selections,'ai_record':ai_summary,'ai_learning':learning,'ai_recent_results':[{k:r.get(k) for k in ('event','sport','selection','market','side','line','probability','projection','actual_value','outcome','ai_selected_at','graded_at','flags')} for r in ai_ledger if r.get('outcome') is not None][-200:],'engine_monitoring':actuarial.monitoring(history,MODEL),'engine_status':{'version':actuarial.VERSION,'full_hierarchical_bayes':False,'full_game_simulation':False,'portfolio_optimizer':'Disabled: forecasts and joint returns not validated','coverage':'Player props with sufficient box-score data; game markets retain legacy scoring model; golf has no automatic model','method_reference':'https://mc-stan.org/docs/stan-users-guide/sampling-from-the-posterior-predictive-distribution.html'},'player_logs':PLAYER_LOGS,'version':MODEL,'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'refresh_minutes':15,'recommendations':rows,'games':future,'injuries':injuries,'metrics':{'tracked_predictions':len(history),'settled_predictions':len(settled),'won':sum(r['outcome'] for r in settled),'brier_score':round(brier,4) if brier is not None else None,'independent_groups':len(groups),'priced_settled':len(priced),'realized_roi_pct':round(100*sum(r['profit_units'] for r in priced)/len(priced),2) if priced else None},'calibration_bins':bins,'coverage':list(SPORTS),'source':'ESPN public scoreboards / boxscores / injury reports; DraftKings game odds where supplied by ESPN','errors':ERRORS,'backfill_remaining':max(0,len(needed)-len(target)),'limitations':['Player-prop prices are not provided by the free game feed. Suggested lines are model thresholds, not sportsbook offers.','Player props use deterministic opportunity/workload scenario models; game markets retain the legacy normal model. Probabilities are not validated.','Injury status and teammate absences are flags; confirmed rotations, player usage redistribution and position-specific defense are not modeled.','No automatic golf prediction or odds feed; exact markets can be imported locally.','Missing player participation remains pending for review, never automatically graded as a loss.']}
+ report['game_coverage']={fixture['id']:{'sport':fixture['sport'],'predictions':sum(r['event_id']==fixture['id'] for r in rows),'ai_picks':len(ai_selections.get(fixture['id'],[])),'status':'AI picks available' if ai_selections.get(fixture['id']) else 'Projections available; no supported picks' if any(r['event_id']==fixture['id'] for r in rows) else 'Awaiting usable history / source data'} for fixture in future}
+ report['daily_coverage']=[{'sport':sport,'games_today':sum(e['sport']==sport and e['day']==TODAY.isoformat() for e in future),'predictions_today':sum(r['sport']==sport and r['day']==TODAY.isoformat() for r in rows),'ai_picks_today':sum(r['sport']==sport and r['day']==TODAY.isoformat() for rs in ai_selections.values() for r in rs)} for sport in SPORTS]
+ report['unsupported_coverage']=['Golf: automatic field/round projections are not connected; no golf predictions are fabricated.']
  # No destructive retention of forecast history. Cache excludes bulky raw feed payloads.
- write('events.json',events);write('history.json',history);write('latest.json',report);write('cache.json',cache)
+ write('events.json',events);write('history.json',history);write('cache.json',cache)
+ write('history-view.json',feed_transport.history_view(history))
+ write('latest.json',feed_transport.compact(report))
+ write('status.json',{'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'version':MODEL,'refresh_minutes':15,'transport_version':2,'games':len(future),'recommendations':len(rows),'source_errors':len(ERRORS)})
  print(f'{len(future)} upcoming games | {len(rows)} lines | {sum(bool(r.get("player_id")) for r in rows)} player lines | {len(settled)} settled | {len(ERRORS)} feed errors')
 if __name__=='__main__':main()
+
 
 
 

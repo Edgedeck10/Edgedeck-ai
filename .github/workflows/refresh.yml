@@ -5,7 +5,7 @@ on:
     paths-ignore:
       - 'data/**'
   schedule:
-    - cron: '7,22,37,52 * * * *'
+    - cron: '3,18,33,48 * * * *'
   workflow_dispatch:
 permissions:
   contents: write
@@ -26,9 +26,12 @@ jobs:
         with:
           python-version: '3.12'
       - name: Verify model and settlement logic
-        run: python -m unittest test_pipeline.py test_actuarial.py
+        run: |
+          python -m unittest test_pipeline.py test_actuarial.py
+          node --check app.js
+          node --check engine-ui.js
       - name: Collect scores, grade history, calibrate predictions
-        run: python pipeline.py
+        run: python pipeline.py || python pipeline.py
       - name: Preserve prediction history
         run: |
           git config user.name 'github-actions[bot]'
@@ -45,7 +48,8 @@ jobs:
         run: |
           mkdir -p _site/data/classic
           cp index.html style.css app.js engine-ui.js manifest.webmanifest icon.svg _site/
-          cp data/classic/latest.json.gz data/classic/history.json.gz _site/data/classic/
+          cp data/classic/latest.json.gz data/classic/status.json _site/data/classic/
+          cp data/classic/history-view.json.gz _site/data/classic/history.json.gz
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -61,3 +65,4 @@ jobs:
       - name: Publish free GitHub Pages site
         id: deployment
         uses: actions/deploy-pages@v4
+

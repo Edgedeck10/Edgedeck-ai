@@ -4,7 +4,7 @@ from collections import defaultdict
 GROUPS={'NFL':'Pro Football','CFL':'Pro Football','UFL':'Pro Football','NCAAF':'College Football','NBA':'Pro Basketball','WNBA':'Pro Basketball','NCAAB':'College Basketball','NCAAW':'College Basketball','NHL':'Hockey','MLB':'Baseball','EPL':'Soccer','MLS':'Soccer','PGA':'Golf','LPGA':'Golf'}
 def mean(xs):return st.mean(xs) if xs else None
 def supported(r):
- if r.get('sample',0)<5:return False
+ if r.get('sample',0)<(5 if r.get('player_id') else 1):return False
  if r.get('odds') is not None:return (r.get('expected_roi_pct') or 0)>0
  return bool(r.get('player_id') and r.get('projection') is not None and r.get('line') is not None and r['side']=='Over' and r['projection']>r['line'] and r['probability']>.5)
 def choose(rows):
@@ -65,4 +65,5 @@ def summarize(ledger):
  for (sport,market),rs in markets.items():
   x=summary(sport+' · '+market,rs);loss=[r for r in rs if r.get('outcome')==0];x['high_confidence_misses']=sum(r['probability']>=.7 for r in loss);x['flagged_misses']=sum(bool(r.get('flags')) for r in loss);x['interpretation']='Review calibration, workload and missing inputs; losses alone do not identify their cause.';diagnostics.append(x)
  return {'records':records,'market_diagnostics':diagnostics,'bundles':bundles,'scope':'First published AI top picks per game, prospectively frozen. Not all alternate thresholds or user tickets. No retrospective top-pick reconstruction.'}
+
 
