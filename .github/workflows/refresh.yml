@@ -30,6 +30,7 @@ jobs:
           python -m unittest test_pipeline.py test_actuarial.py
           node --check app.js
           node --check engine-ui.js
+          node test_refresh_ui.cjs
       - name: Collect scores, grade history, calibrate predictions
         run: python pipeline.py || python pipeline.py
       - name: Preserve prediction history
