@@ -335,7 +335,7 @@ def main():
   for side in ('home','away'):e[side].setdefault('periods',[]);e[side].setdefault('stats',{});e[side].setdefault('abbr',e[side]['name'])
  jobs=[]
  for sport in SPORTS:
-  offsets=(-1,0,1,2,5) if sport in ('NFL','NCAAF') else (-1,0,1,2)
+  offsets=range(-1,8) if sport in ('NFL','NCAAF') else (-1,0,1,2)
   for off in offsets:jobs.append((f'{sport}:{off}',scoreboard,(sport,(TODAY+dt.timedelta(days=off)).isoformat())))
  for key,gs in parallel(jobs):
   for e in gs:events[e['id']]=e
@@ -343,7 +343,7 @@ def main():
  pending={(r['sport'],iso(r.get('start')).date().isoformat()) for r in history if r.get('outcome') is None and iso(r.get('start'))<NOW-dt.timedelta(days=1) and r['sport'] in SPORTS}
  for _,gs in parallel([(f'pending:{s}:{d}',scoreboard,(s,d)) for s,d in pending]):
   for e in gs:events[e['id']]=e
- future=sorted([e for e in events.values() if not e.get('final') and e.get('state')=='pre' and NOW<iso(e['start'])<NOW+dt.timedelta(days=6 if e['sport'] in ('NFL','NCAAF') else 2)],key=lambda e:e['start'])
+ future=sorted([e for e in events.values() if not e.get('final') and e.get('state')=='pre' and NOW<iso(e['start']) and (e['day']<=(TODAY+dt.timedelta(days=7)).isoformat() if e['sport'] in ('NFL','NCAAF') else iso(e['start'])<NOW+dt.timedelta(days=2))],key=lambda e:e['start'])
  # Cache past team schedules daily; bootstrap real season-window samples.
  teams={(e['sport'],e[s]['id']) for e in future for s in ('home','away') }
  jobs=[]
