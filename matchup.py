@@ -4,12 +4,19 @@ from collections import defaultdict
 import statistics as st
 import actuarial
 CACHE={}
+FOOTBALL_ROLES={
+ 'Rushing yards':{'QB','RB','FB','WR'},
+ 'Receiving yards':{'WR','TE','RB','FB'},
+ 'Receptions':{'WR','TE','RB','FB'},
+}
+
 class Index:
- def __init__(self,records,events,sport,market):
+ def __init__(self,records,events,sport,market,position=None):
   self.groups=defaultdict(list)
   for rs in records.values():
    pairs,unit,family=actuarial.pairs_for(rs,sport,market)
    for r,y,x in pairs:
+    if position and r.get('position')!=position:continue
     e=events.get(r['event_id'],{});home=e.get('home',{});away=e.get('away',{})
     opponent=away.get('id') if r['team_id']==home.get('id') else home.get('id') if r['team_id']==away.get('id') else None
     if not opponent:continue
@@ -32,10 +39,10 @@ def opponent_of(r,events):
  e=events.get(r['event_id'],{});h=e.get('home',{});a=e.get('away',{})
  return a.get('id') if h.get('id')==r['team_id'] else h.get('id') if a.get('id')==r['team_id'] else None
 
-def evaluate(games,records,events,event,sport,market,team_id):
+def evaluate(games,records,events,event,sport,market,team_id,position=None):
  # Each historical feature is queried strictly before its target game's start.
- token=(sport,market,event['start'][:10],sum(len(rs) for rs in records.values()))
- if token not in CACHE:CACHE[token]=Index(records,events,sport,market)
+ token=(sport,market,position,event['start'][:10],sum(len(rs) for rs in records.values()))
+ if token not in CACHE:CACHE[token]=Index(records,events,sport,market,position)
  index=CACHE[token];pairs,unit,family=actuarial.pairs_for(games,sport,market);pairs=pairs[-60:]
  upcoming=event['away' if event['home']['id']==team_id else 'home']['id']
  ratio,n,opp,league=index.ratio(upcoming,event['start']);origins=[]
@@ -58,4 +65,23 @@ def evaluate(games,records,events,event,sport,market,team_id):
  for venue in ('home','away'):
   subset=[(r,y,x) for r,y,x in pairs if ('home' if events.get(r['event_id'],{}).get('home',{}).get('id')==r['team_id'] else 'away' if events.get(r['event_id'],{}).get('away',{}).get('id')==r['team_id'] else 'unknown')==venue]
   if subset:splits[venue]={'games':len(subset),'production_mean':st.mean(y for _,y,x in subset),'rate':sum(y for _,y,x in subset)/sum(x for _,y,x in subset)}
- return {'multiplier':multiplier,'opponent_rate':opp,'league_rate':league,'opponent_games':n,'opportunity_unit':unit,'selected_strength':selected,'applied_strength':applied,'tuning_games':tune_n,'holdout_games':hold_n,'baseline_holdout_mae':baseline_mae,'adjusted_holdout_mae':adjusted_mae,'status':'Applied: improved later holdout' if applied and ratio is not None else 'Not applied: missing data or no holdout improvement','scope':'Opponent allowance per opportunity across available players; not position-adjusted. Holdout is an activation gate, not an untouched accuracy test. No pace bonus is stacked onto this rate.','form_windows':form,'venue_splits':splits,'venue_adjustment_applied':False}
+ return {'multiplier':multiplier,'opponent_rate':opp,'league_rate':league,'opponent_games':n,'opportunity_unit':unit,'selected_strength':selected,'applied_strength':applied,'tuning_games':tune_n,'holdout_games':hold_n,'baseline_holdout_mae':baseline_mae,'adjusted_holdout_mae':adjusted_mae,'status':'Applied: improved later holdout' if applied and ratio is not None else 'Not applied: missing data or no holdout improvement','scope':('Listed position only; does not identify slot alignment or defensive play calls.' if position else 'Opponent allowance per opportunity across available players.')+' Holdout is an activation gate, not an untouched accuracy test.', 'position':position,'form_windows':form,'venue_splits':splits,'venue_adjustment_applied':False}
+
+def football_matchup(games,records,events,event,market,team_id,position,overall):
+ """Use listed-position evidence only when it helps this player's later games."""
+ eligible=position in FOOTBALL_ROLES.get(market,()) and (
+  market=='Rushing yards' or overall['opportunity_unit'] in ('Targets','Receptions'))
+ profile=evaluate(games,records,events,event,event['sport'],market,team_id,position) if eligible else None
+ applied=bool(profile and profile['applied_strength'] and profile['opponent_games']>=5 and profile['league_rate'] and profile['opponent_rate'] is not None)
+ result=dict(profile if applied else overall)
+ if applied:
+  # Bound the impact of sparse position splits.
+  result['multiplier']=max(.90,min(1.10,result['multiplier']))
+ result['football_defense']={
+  'listed_position':position,'position_sample':profile['opponent_games'] if profile else 0,
+  'position_used':applied,'position_allowance':profile['opponent_rate'] if profile else None,
+  'position_league_rate':profile['league_rate'] if profile else None,
+  'overall_allowance':overall['opponent_rate'],'overall_league_rate':overall['league_rate'],
+  'alignment_available':False,'defensive_play_calls_available':False,
+ }
+ return result

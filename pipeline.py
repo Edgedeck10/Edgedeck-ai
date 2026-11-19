@@ -102,13 +102,15 @@ def parse_box(d,e):
     if e['sport']=='NHL' and 'S' in raw and num(raw['S']) is not None:stats['Shots on goal']=num(raw['S'])
     if not stats:continue
     athlete=a.get('athlete',{});pid=str(athlete.get('id',''))
-    rows.append({'player_id':pid,'player':athlete.get('displayName',''),'team_id':tid,'event_id':e['id'],'start':e['start'],'sport':e['sport'],'stats':stats,'source_url':next((z['href'] for z in athlete.get('links',[]) if z.get('href','').startswith('https://')),e['source_url'])})
+    position=(athlete.get('position') or {}).get('abbreviation')
+    rows.append({'position':position,'player_id':pid,'player':athlete.get('displayName',''),'team_id':tid,'event_id':e['id'],'start':e['start'],'sport':e['sport'],'stats':stats,'source_url':next((z['href'] for z in athlete.get('links',[]) if z.get('href','').startswith('https://')),e['source_url'])})
  # Football players can appear in multiple categories. Merge, summing TD only.
  merged={}
  for r in rows:
   key=r['player_id']
   if key not in merged:merged[key]=r
   else:
+   if not merged[key].get('position'):merged[key]['position']=r.get('position')
    for k,v in r['stats'].items():
     if r['sport']=='NHL' and k=='Shots on goal' and k in merged[key]['stats']:continue
     merged[key]['stats'][k]=merged[key]['stats'].get(k,0)+v if k=='Touchdowns' else v
@@ -269,6 +271,9 @@ def player_rows(events,e,box,injuries,history):
    if expected_minutes and abs(mean(mins[-3:])-mean(mins))>4:flag.append('Minutes volatility');sig*=1.15
    if flag and status.lower() not in ('not listed','active','available','probable'):sig*=1.2
    match=matchup.evaluate(games,records,events,e,e['sport'],market,latest['team_id'])
+   if e['sport'] in ('NFL','NCAAF') and market in matchup.FOOTBALL_ROLES:
+    position=next((g['position'] for g in reversed(games) if g['team_id']==latest['team_id'] and g.get('position')),None)
+    match=matchup.football_matchup(games,records,events,e,market,latest['team_id'],position,match)
    engine=actuarial.fit(games,records,e['sport'],market,pid,log_key,adjustment=match['multiplier'])
    if engine:engine['evidence']['matchup_framework']=match
    if engine:
@@ -288,7 +293,12 @@ def player_rows(events,e,box,injuries,history):
      if engine:
       estimates=actuarial.price(engine['evidence'],line,side,r.get('odds'));r.update(estimates);r['raw_probability']=r['probability'];r['calibration_games']=0
       r['engine_version']=actuarial.VERSION;r['model_status']='Research / unvalidated';r['qualified']=False
-      r['reasoning']=f"{engine['evidence']['expected_opportunity']} expected {engine['evidence']['opportunity_unit']} × {engine['evidence']['shrunk_rate']} production per opportunity. Scenario-mixture mean {projection:.2f}. Opponent rate adjustment: {match['status']} (multiplier {match['multiplier']:.3f}). Confirmed lineup, position-specific defense and weather adjustments remain unavailable."
+      r['reasoning']=f"{engine['evidence']['expected_opportunity']} expected {engine['evidence']['opportunity_unit']} × {engine['evidence']['shrunk_rate']} production per opportunity. Scenario-mixture mean {projection:.2f}. Opponent rate adjustment: {match['status']} (multiplier {match['multiplier']:.3f}). Confirmed lineup and weather adjustments remain unavailable."
+      if 'football_defense' in match:
+       rate_label=f" {match['opportunity_unit']}"
+       if match['opponent_rate'] is not None and match['league_rate'] is not None:
+        group=f" for listed {match['position']}s" if match['position'] else " across available positions"
+        r['reasoning']+=f" Defense allowed {match['opponent_rate']:.2f} per{rate_label}{group} over {match['opponent_games']} games, versus a {match['league_rate']:.2f} league baseline. Slot alignment and defensive play calls are unavailable."
       r['selection_status']='Unpriced research' if r.get('odds') is None else 'Positive estimated value' if r['expected_roi_pct']>0 else 'Pass at this price'
      rows.append(r)
  return rows
@@ -375,7 +385,7 @@ def main():
   if e['sport'] not in tuple(SPORTS):continue
   for side in ('home','away'):
    for g in team_past(events,e,e[side]['id'])[-12:]:
-    if not box.get(g['id']) or cache['box_schema'].get(g['id'])!=4:needed[g['id']]=g
+    if not box.get(g['id']) or cache['box_schema'].get(g['id'])!=(5 if g['sport'] in ('NFL','NCAAF') else 4):needed[g['id']]=g
  for r in history:
   if r.get('outcome') is None and r.get('player_id') and r['event_id'] in events and events[r['event_id']].get('final'):needed[r['event_id']]=events[r['event_id']]
  # Prioritize NBA player model on initial backfill, then other leagues. 180 max per run.
@@ -388,7 +398,7 @@ def main():
    if not queues[sport]:del queues[sport]
  for key,d in parallel([(e['id'],summary,(e,)) for e in target]):
   rows=parse_box(d,events[key])
-  if rows:box[key]=rows;cache['box_schema'][key]=4
+  if rows:box[key]=rows;cache['box_schema'][key]=5 if events[key]['sport'] in ('NFL','NCAAF') else 4
  write('cache.json',cache);write('events.json',events)
  # Pregame summaries supply fresh injury flags and fallback odds snapshots.
  injuries=[]
