@@ -140,6 +140,55 @@ def team_factors(events,e,side):
  mu+=venue_adjustment
  return mu,{'team_name':t['name'],'team_id':t['id'],'opponent_name':o['name'],'scoring_average':mean(own,base),'opponent_allowed_average':mean(oppallow,base),'scoring_games':len(own),'opponent_defense_games':len(oppallow),'fallback_scoring':not own,'fallback_defense':not oppallow,'fallback_value':base,'blend':blend,'rest_adjustment':rest_adjusted-blend,'venue_adjustment':venue_adjustment,'projected_score':mu,'source_games':[{'event_id':g['id'],'date':g['start'],'event':g['event'],'home_score':g['home'].get('score'),'away_score':g['away'].get('score'),'home_id':g['home']['id'],'away_id':g['away']['id'],'home_name':g['home']['name'],'away_name':g['away']['name'],'home_periods':g['home'].get('periods',[]),'away_periods':g['away'].get('periods',[]),'source_url':g.get('source_url')} for g in {x['id']:x for x in past+opp}.values()],'games':len(own),'points_for':round(mean(own,base),1),'points_allowed':round(mean(allowed,base),1),'opponent_allowed':round(mean(oppallow,base),1),'rest_days':round(rest,1) if rest is not None else None,'back_to_back':rest is not None and rest<.5,'last5':own[-5:],'sd':max(sd,st.pstdev(own) if len(own)>2 else sd)}
 
+def anytime_touchdowns(events, fixture, boxes, injuries):
+ """Rank NFL scorers using offensive TD opportunity from completed box scores."""
+ ranked=[]
+ unavailable={'out','doubtful','injured reserve','ir','suspended','suspension','pup'}
+ statuses={r['player_id']:r['status'] for r in injuries if r['event_id']==fixture['id']}
+ for side,other in (('home','away'),('away','home')):
+  team,opponent=fixture[side],fixture[other]
+  def recent_offenses(team_id, allowed=False):
+   samples=[]
+   for game in reversed(team_past(events,fixture,team_id)):
+    if iso(game['start'])>=NOW or not boxes.get(game['id']):continue
+    other_id=game['away']['id'] if game['home']['id']==team_id else game['home']['id']
+    offense=other_id if allowed else team_id
+    records=[r for r in boxes[game['id']] if r['team_id']==offense]
+    if any((r['stats'].get('Pass attempts') or 0)>0 for r in records):samples.append(records)
+    if len(samples)==6:break
+   return samples
+  own=recent_offenses(team['id'])
+  allowed=recent_offenses(opponent['id'],True)
+  if len(own)<3:continue
+  def td_count(records):
+   return sum(r['stats'].get('Touchdowns',0) for r in records)
+  own_rate=mean([td_count(rs) for rs in own])
+  allowed_rate=mean([td_count(rs) for rs in allowed],2.5)
+  scoring=(len(own)*own_rate+len(allowed)*allowed_rate+4*2.5)/(len(own)+len(allowed)+4)
+  usage=defaultdict(lambda:{'tds':0,'touches':0,'games':0})
+  for i,records in enumerate(own):
+   for row in records:
+    pid=row['player_id']
+    if not pid:continue
+    stats=row['stats']
+    x=usage[pid];x.setdefault('name',row['player']);x.setdefault('last_seen',i)
+    x['tds']+=td_count([row])
+    x['touches']+=(stats.get('Carries') or 0)+(stats.get('Receptions') or 0)
+    x['games']+=1
+  total_td=sum(x['tds'] for x in usage.values())
+  total_touches=sum(x['touches'] for x in usage.values())
+  if not total_touches:continue
+  for pid,x in usage.items():
+   status=statuses.get(pid,'Not listed')
+   if status.strip().lower() in unavailable or x['last_seen']>1 or x['games']<2 or not x['touches']:continue
+   share=(x['tds']+8*x['touches']/total_touches)/(total_td+8)
+   probability=-math.expm1(-scoring*share)
+   ranked.append({'player':x['name'],'team':team['name'],'player_id':pid,'probability':probability,
+    'fair_odds':fair(clip(probability)),'tds':x['tds'],'touches':x['touches'],'games':len(own),
+    'opponent_td_allowed':round(allowed_rate,2) if allowed else None,'defense_games':len(allowed),
+    'team_td_projection':round(scoring,2),'injury_status':status})
+ return sorted(ranked,key=lambda r:(-r['probability'],r['player_id']))[:2]
+
 def calibrate(history,key,p):
  # One immutable first forecast per event/entity/market/direction, fit past events only.
  cache_key=(id(history),len(history),key)
@@ -450,6 +499,7 @@ def main():
  for lo in (0,.5,.6,.7,.8,.9):
   hi=.5 if lo==0 else lo+.1;rs=[r for r in settled if lo<=r['probability']<hi];bins.append({'from':lo,'to':round(hi,2),'n':len(rs),'predicted':mean([r['probability'] for r in rs],None),'actual':mean([r['outcome'] for r in rs],None)})
  report={'ai_selections':ai_selections,'ai_record':ai_summary,'ai_learning':learning,'ai_recent_results':[{k:r.get(k) for k in ('event','sport','selection','market','side','line','probability','projection','actual_value','outcome','ai_selected_at','graded_at','flags')} for r in ai_ledger if r.get('outcome') is not None][-200:],'engine_monitoring':actuarial.monitoring(history,MODEL),'engine_status':{'version':actuarial.VERSION,'full_hierarchical_bayes':False,'full_game_simulation':False,'portfolio_optimizer':'Disabled: forecasts and joint returns not validated','coverage':'Player props with sufficient box-score data; game markets retain legacy scoring model; golf has no automatic model','method_reference':'https://mc-stan.org/docs/stan-users-guide/sampling-from-the-posterior-predictive-distribution.html'},'player_logs':PLAYER_LOGS,'version':MODEL,'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'refresh_minutes':15,'recommendations':rows,'games':future,'injuries':injuries,'metrics':{'tracked_predictions':len(history),'settled_predictions':len(settled),'won':sum(r['outcome'] for r in settled),'brier_score':round(brier,4) if brier is not None else None,'independent_groups':len(groups),'priced_settled':len(priced),'realized_roi_pct':round(100*sum(r['profit_units'] for r in priced)/len(priced),2) if priced else None},'calibration_bins':bins,'coverage':list(SPORTS),'source':'ESPN public scoreboards / boxscores / injury reports; DraftKings game odds where supplied by ESPN','errors':ERRORS,'backfill_remaining':max(0,len(needed)-len(target)),'limitations':['Player-prop prices are not provided by the free game feed. Suggested lines are model thresholds, not sportsbook offers.','Player props use deterministic opportunity/workload scenario models; game markets retain the legacy normal model. Probabilities are not validated.','Injury status and teammate absences are flags; confirmed rotations, player usage redistribution and position-specific defense are not modeled.','No automatic golf prediction or odds feed; exact markets can be imported locally.','Missing player participation remains pending for review, never automatically graded as a loss.']}
+ report['td_candidates']={e['id']:anytime_touchdowns(events,e,box,injuries) for e in future if e['sport']=='NFL'}
  report['game_coverage']={fixture['id']:{'sport':fixture['sport'],'predictions':sum(r['event_id']==fixture['id'] for r in rows),'ai_picks':len(ai_selections.get(fixture['id'],[])),'status':'AI picks available' if ai_selections.get(fixture['id']) else 'Projections available; no supported picks' if any(r['event_id']==fixture['id'] for r in rows) else 'Awaiting usable history / source data'} for fixture in future}
  report['daily_coverage']=[{'sport':sport,'games_today':sum(e['sport']==sport and e['day']==TODAY.isoformat() for e in future),'predictions_today':sum(r['sport']==sport and r['day']==TODAY.isoformat() for r in rows),'ai_picks_today':sum(r['sport']==sport and r['day']==TODAY.isoformat() for rs in ai_selections.values() for r in rs)} for sport in SPORTS]
  report['unsupported_coverage']=['Golf: automatic field/round projections are not connected; no golf predictions are fabricated.']
