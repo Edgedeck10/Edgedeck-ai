@@ -24,15 +24,26 @@ def calibration(ledger,before):
   if r.get('outcome') in (0,1) and r.get('graded_at','')<before and r.get('model_version')=='opportunity-4.2.0':groups[(r['sport'],r['market'])].append(r)
  output={}
  for (sport,market),rs in groups.items():
-  rs.sort(key=lambda r:r['start']);days=sorted(set(r['start'][:10] for r in rs));applied=0.;train_n=0;hold_n=0;raw=None;adjusted=None
+  rs.sort(key=lambda r:r['start']);days=sorted(set(r['start'][:10] for r in rs));applied=0.;train_n=0;hold_n=0;raw=None;adjusted=None;raw_log=None;adjusted_log=None
   if len(rs)>=30 and len(days)>=10:
    cut=days[max(1,int(len(days)*.7))];train=[r for r in rs if r['start'][:10]<cut];hold=[r for r in rs if r['start'][:10]>=cut];train_n=len(train);hold_n=len(hold)
    p=lambda r:r.get('raw_ai_probability',r['probability'])/max(1e-9,1-r.get('push_probability',0))
    bias=max(-.05,min(.05,st.mean(r['outcome']-p(r) for r in train)*len(train)/(len(train)+100)))
    clamp=lambda p:max(.001,min(.999,p))
    raw=mean([(p(r)-r['outcome'])**2 for r in hold]);adjusted=mean([(clamp(p(r)+bias)-r['outcome'])**2 for r in hold])
-   if adjusted<raw:applied=bias
-  output[sport+'|'+market]={'conditional_probability_offset':applied,'samples':len(rs),'game_dates':len(days),'training_picks':train_n,'holdout_picks':hold_n,'baseline_brier':raw,'adjusted_brier':adjusted,'status':'Active: later-date Brier improved' if applied else 'Monitoring: insufficient evidence or no holdout improvement','scope':'Bias correction only, maximum 5 percentage points. Activation holdout is not an untouched accuracy test; no causal diagnosis.'}
+   def log_loss(probability,outcome):
+    probability=clamp(probability)
+    return -math.log(probability if outcome else 1-probability)
+   raw_log=mean([log_loss(p(r),r['outcome']) for r in hold])
+   adjusted_log=mean([log_loss(p(r)+bias,r['outcome']) for r in hold])
+   if adjusted<raw and adjusted_log<raw_log:applied=bias
+  priced=[r for r in rs if isinstance(r.get('odds'),(int,float)) and abs(r['odds'])>=100]
+  # Offered prices include sportsbook margin. Compare the same graded selections.
+  def break_even(odds):return abs(odds)/(abs(odds)+100) if odds<0 else 100/(odds+100)
+  benchmark={'picks':len(priced),
+    'model_brier':mean([(r['probability']/max(1e-9,1-r.get('push_probability',0))-r['outcome'])**2 for r in priced]),
+    'price_brier':mean([(break_even(r['odds'])-r['outcome'])**2 for r in priced])}
+  output[sport+'|'+market]={'price_benchmark':benchmark,'conditional_probability_offset':applied,'samples':len(rs),'game_dates':len(days),'training_picks':train_n,'holdout_picks':hold_n,'baseline_brier':raw,'adjusted_brier':adjusted,'baseline_log_loss':raw_log,'adjusted_log_loss':adjusted_log,'status':'Active: later-date Brier and log loss improved' if applied else 'Monitoring: insufficient evidence or no holdout improvement','scope':'Bias correction only, maximum 5 percentage points. Activation holdout is not an untouched accuracy test; no causal diagnosis.'}
  return output
 
 def apply(row,learning):
