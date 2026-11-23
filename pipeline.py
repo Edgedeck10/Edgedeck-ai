@@ -82,6 +82,8 @@ def parse_box(d,e):
     raw=dict(zip(labels,a.get('stats',[])));stats={}
     mapping={'PTS':'Points','REB':'Rebounds','AST':'Assists','STL':'Steals','BLK':'Blocks','TO':'Turnovers','SOG':'Shots on goal','SV':'Saves','G':'Goals','A':'Assists','H':'Hits','R':'Runs','RBI':'RBIs','HR':'Home runs','BB':'Walks','SO':'Strikeouts','K':'Strikeouts','REC':'Receptions'}
     for k,v in raw.items():
+     # REC in a football fumbles table means recoveries, not catches.
+     if k=='REC' and e['sport'] in ('NFL','NCAAF') and category!='receiving':continue
      if k in mapping and num(v) is not None:stats[mapping[k]]=num(v)
     for k in ('3PT','3PM','3P'):
      if k in raw and num(str(raw[k]).split('-')[0]) is not None:stats['Threes']=num(str(raw[k]).split('-')[0])
@@ -481,6 +483,13 @@ def main():
  for e in future:
   ids=sum([cache['rosters'].get(e['sport']+':'+e[s]['id'],{}).get('ids',[]) for s in ('home','away')],[])
   if ids:e['roster_ids']=ids
+ # Old football reception grades used a parser that conflated catches and recoveries.
+ # Preserve the original grade for audit and verify it again against a refreshed box.
+ for r in history+ai_ledger:
+  if r.get('market')!='Receptions' or r.get('sport') not in ('NFL','NCAAF') or not r.get('player_id'):continue
+  if cache['box_schema'].get(r['event_id'])==6 or r.get('outcome') is None:continue
+  r.setdefault('pre_reception_audit_grade',{k:r.get(k) for k in ('outcome','actual_value','graded_at','profit_units')})
+  r.update(outcome=None,actual_value=None,graded_at=None,profit_units=None)
  # Backfill a bounded set of final boxscores; completed boxes retained, recent missing boxes retried.
  needed={}
  for e in future:
@@ -488,8 +497,8 @@ def main():
   for side in ('home','away'):
    for g in team_past(events,e,e[side]['id'])[-12:]:
     football=g['sport'] in ('NFL','NCAAF')
-    if not box.get(g['id']) or cache['box_schema'].get(g['id'])!=(5 if football else 4) or (football and g['id'] not in first_scores):needed[g['id']]=g
- for r in history:
+    if not box.get(g['id']) or cache['box_schema'].get(g['id'])!=(6 if football else 4) or (football and g['id'] not in first_scores):needed[g['id']]=g
+ for r in history+ai_ledger:
   if r.get('outcome') is None and r.get('player_id') and r['event_id'] in events and events[r['event_id']].get('final'):needed[r['event_id']]=events[r['event_id']]
  # Prioritize NBA player model on initial backfill, then other leagues. 180 max per run.
  queues=defaultdict(list)
@@ -502,7 +511,7 @@ def main():
  for key,d in parallel([(e['id'],summary,(e,)) for e in target]):
   rows=parse_box(d,events[key])
   if rows:
-   box[key]=rows;cache['box_schema'][key]=5 if events[key]['sport'] in ('NFL','NCAAF') else 4
+   box[key]=rows;cache['box_schema'][key]=6 if events[key]['sport'] in ('NFL','NCAAF') else 4
    if events[key]['sport'] in ('NFL','NCAAF') and isinstance(d.get('scoringPlays'),list):
     first_scores[key]=first_touchdown(d,rows)
  write('cache.json',cache);write('events.json',events)
@@ -516,12 +525,16 @@ def main():
   if r.get('outcome') is not None:continue
   e=events.get(r['event_id'])
   if not e:continue
+  if r.get('market')=='Receptions' and e['sport'] in ('NFL','NCAAF') and cache['box_schema'].get(e['id'])!=6:continue
   result=settle(r,e,box)
   if result is not None:
    r['outcome']=result;r['actual_value']=actual_value(r,e,box);r['graded_at']=NOW.isoformat();r['profit_units']=0 if result=='push' else round(dec(r['odds'])-1 if result else -1,4) if r.get('odds') else None
  rows=[]
  # Old hockey parser could confuse shootout SOG with regulation shots; do not model those boxes.
  prediction_box={k:v for k,v in box.items() if not v or v[0]['sport']!='NHL' or cache['box_schema'].get(k)==4}
+ for key,records in prediction_box.items():
+  if records and records[0]['sport'] in ('NFL','NCAAF') and cache['box_schema'].get(key)!=6:
+   prediction_box[key]=[{**r,'stats':{k:v for k,v in r['stats'].items() if k!='Receptions'}} for r in records]
  for e in future:
   rows+=team_rows(events,e,history);rows+=player_rows(events,e,prediction_box,injuries,history)
  learning=ai_record.calibration(ai_ledger,NOW.isoformat())
@@ -556,7 +569,7 @@ def main():
  for lo in (0,.5,.6,.7,.8,.9):
   hi=.5 if lo==0 else lo+.1;rs=[r for r in settled if lo<=r['probability']<hi];bins.append({'from':lo,'to':round(hi,2),'n':len(rs),'predicted':mean([r['probability'] for r in rs],None),'actual':mean([r['outcome'] for r in rs],None)})
  report={'ai_selections':ai_selections,'ai_record':ai_summary,'ai_learning':learning,'ai_recent_results':[{k:r.get(k) for k in ('event','sport','selection','market','side','line','probability','projection','actual_value','outcome','ai_selected_at','graded_at','flags')} for r in ai_ledger if r.get('outcome') is not None][-200:],'engine_monitoring':actuarial.monitoring(history,MODEL),'engine_status':{'version':actuarial.VERSION,'full_hierarchical_bayes':False,'full_game_simulation':False,'portfolio_optimizer':'Disabled: forecasts and joint returns not validated','coverage':'Player props with sufficient box-score data; game markets retain legacy scoring model; golf has no automatic model','method_reference':'https://mc-stan.org/docs/stan-users-guide/sampling-from-the-posterior-predictive-distribution.html'},'player_logs':PLAYER_LOGS,'version':MODEL,'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'refresh_minutes':15,'recommendations':rows,'games':future,'injuries':injuries,'metrics':{'tracked_predictions':len(history),'settled_predictions':len(settled),'won':sum(r['outcome'] for r in settled),'brier_score':round(brier,4) if brier is not None else None,'independent_groups':len(groups),'priced_settled':len(priced),'realized_roi_pct':round(100*sum(r['profit_units'] for r in priced)/len(priced),2) if priced else None},'calibration_bins':bins,'coverage':list(SPORTS),'source':'ESPN public scoreboards / boxscores / injury reports; DraftKings game odds where supplied by ESPN','errors':ERRORS,'backfill_remaining':max(0,len(needed)-len(target)),'limitations':['Player-prop prices are not provided by the free game feed. Suggested lines are model thresholds, not sportsbook offers.','Player props use deterministic opportunity/workload scenario models; game markets retain the legacy normal model. Probabilities are not validated.','Injury status and teammate absences are flags; confirmed rotations, player usage redistribution and position-specific defense are not modeled.','No automatic golf prediction or odds feed; exact markets can be imported locally.','Missing player participation remains pending for review, never automatically graded as a loss.']}
- report['td_candidates']={e['id']:anytime_touchdowns(events,e,box,injuries,first_scores) for e in future if e['sport'] in ('NFL','NCAAF')}
+ report['td_candidates']={e['id']:anytime_touchdowns(events,e,prediction_box,injuries,first_scores) for e in future if e['sport'] in ('NFL','NCAAF')}
  report['game_coverage']={fixture['id']:{'sport':fixture['sport'],'predictions':sum(r['event_id']==fixture['id'] for r in rows),'ai_picks':len(ai_selections.get(fixture['id'],[])),'status':'AI picks available' if ai_selections.get(fixture['id']) else 'Projections available; no supported picks' if any(r['event_id']==fixture['id'] for r in rows) else 'Awaiting usable history / source data'} for fixture in future}
  report['daily_coverage']=[{'sport':sport,'games_today':sum(e['sport']==sport and e['day']==TODAY.isoformat() for e in future),'predictions_today':sum(r['sport']==sport and r['day']==TODAY.isoformat() for r in rows),'ai_picks_today':sum(r['sport']==sport and r['day']==TODAY.isoformat() for rs in ai_selections.values() for r in rs)} for sport in SPORTS]
  report['unsupported_coverage']=['Golf: automatic field/round projections are not connected; no golf predictions are fabricated.']
