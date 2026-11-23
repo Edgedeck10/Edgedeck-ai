@@ -1,7 +1,7 @@
 /* Opportunity evidence and approximate empirical-dependence parlay research. */
 function engineFor(r){return r.frozen_model||report.player_logs?.[r.log_key]?.model||null}
 function enginePrice(r,line=r.line,side=r.side,odds=r.odds){
- const model=engineFor(r);if(!model)return null;
+ const model=engineFor(r);if(!model?.draw_histograms?.length)return null;
  const ps=[],pushes=[],evs=[];
  for(const h of model.draw_histograms){let total=0,w=0,u=0;for(const [y,n] of Object.entries(h)){total+=n;if(Number(y)===line)u+=n;else if(side==='Under'?Number(y)<line:Number(y)>line)w+=n}const p=Math.max(0,Math.min(1-u/total,w/total+(line===r.line&&side===r.side?(r.learning_offset||0):0)));ps.push(p);pushes.push(u/total);if(odds!=null)evs.push(p*(decimal(odds)-1)-(1-p-u/total))}
  const avg=a=>a.reduce((x,y,i)=>x+y*(model.scenario_weights?.[i]??1/a.length),0),q=(a,p)=>{a=[...a].sort((x,y)=>x-y);return a[Math.floor((a.length-1)*p)]},p=(line===r.line&&side===r.side&&r.learning_offset?r.probability:avg(ps)),push=avg(pushes),conditional=Math.max(.0001,Math.min(.9999,p/(1-push)||.5));

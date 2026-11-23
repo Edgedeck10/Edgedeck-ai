@@ -563,8 +563,8 @@ def main():
  # No destructive retention of forecast history. Cache excludes bulky raw feed payloads.
  write('events.json',events);write('history.json',history);write('cache.json',cache)
  write('history-view.json',feed_transport.history_view(history))
- write('latest.json',feed_transport.compact(report))
- write('status.json',{'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'version':MODEL,'refresh_minutes':15,'transport_version':2,'games':len(future),'recommendations':len(rows),'source_errors':len(ERRORS)})
+ write('latest.json',feed_transport.compact(report,DATA/'details'))
+ write('status.json',{'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'version':MODEL,'refresh_minutes':15,'transport_version':3,'games':len(future),'recommendations':len(rows),'source_errors':len(ERRORS)})
  print(f'{len(future)} upcoming games | {len(rows)} lines | {sum(bool(r.get("player_id")) for r in rows)} player lines | {len(settled)} settled | {len(ERRORS)} feed errors')
 if __name__=='__main__':main()
 

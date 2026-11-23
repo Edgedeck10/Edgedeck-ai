@@ -40,7 +40,7 @@ class RefreshRegression(unittest.TestCase):
   self.assertIn('NFL:past',saved['events.json'])
   self.assertIn('status.json',saved)
   self.assertGreater(len(saved['latest.json']['recommendations']),0)
-  self.assertEqual(saved['latest.json']['transport_version'],2)
+  self.assertEqual(saved['latest.json']['transport_version'],3)
  def test_compact_transport_preserves_predictions_and_archives(self):
   import feed_transport as f
   model={'draw_histograms':[{'0':.25,'2':.75}]};r={'id':'r','event_id':'e','player_id':'p','probability':.75,'context':{'source_games':[1]*100,'venue':'home'}}
@@ -51,3 +51,22 @@ class RefreshRegression(unittest.TestCase):
   self.assertNotIn('source_games',compact['recommendations'][0]['context'])
   self.assertEqual(len(r['context']['source_games']),100)
   self.assertEqual(f.history_view([r])[0]['probability'],.75)
+
+class LazyFeedRegression(unittest.TestCase):
+ def test_lazy_feed_preserves_probabilities_and_full_distribution(self):
+  import feed_transport as f
+  import gzip,json,tempfile,pathlib
+  model={'draw_histograms':[{'0':.25,'2':.75}]}
+  rows=[{'id':str(line),'event_id':'e','log_key':'e:p:Points','player_id':'p','line':line,'probability':.75,'context':{}} for line in (1,1.5)]
+  source={'games':[{'id':'e'}],'recommendations':rows,'player_logs':{'e:p:Points':{'games':[],'model':model}},'ai_selections':{'e':[{**rows[0],'frozen_model':model}]}}
+  with tempfile.TemporaryDirectory() as directory:
+   path=pathlib.Path(directory)/'details'
+   compact=f.compact(source,path)
+   restored=[{**compact['row_templates'].get(r.get('row_template'),{}),**r} for r in compact['recommendations']]
+   self.assertEqual([r['probability'] for r in restored],[r['probability'] for r in rows])
+   self.assertEqual([r['line'] for r in restored],[1,1.5])
+   payload=json.loads(gzip.decompress((path.parent/compact['detail_files']['e']).read_bytes()))
+   mid=payload['player_logs']['e:p:Points']['model']['distribution_id']
+   self.assertEqual(payload['distributions'][mid],model['draw_histograms'])
+   self.assertIn('frozen_model',source['ai_selections']['e'][0])
+   self.assertNotIn('frozen_model',compact['ai_selections']['e'][0])
