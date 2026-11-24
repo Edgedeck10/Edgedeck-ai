@@ -52,6 +52,7 @@ jobs:
           cp data/classic/latest.json.gz data/classic/status.json _site/data/classic/
           cp -R data/classic/details _site/data/classic/
           cp data/classic/history-view.json.gz _site/data/classic/history.json.gz
+          cp data/classic/pick-record.json.gz _site/data/classic/
           touch _site/.nojekyll
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -16,7 +16,7 @@ NOW=dt.datetime.now(dt.timezone.utc); TODAY=NOW.astimezone(ZoneInfo('America/Ind
 SPORTS={'NBA':'basketball/nba','NFL':'football/nfl','NHL':'hockey/nhl','MLB':'baseball/mlb','NCAAF':'football/college-football','NCAAB':'basketball/mens-college-basketball','WNBA':'basketball/wnba','EPL':'soccer/eng.1','MLS':'soccer/usa.1'}
 DEFAULTS={'NBA':(112,15),'NCAAB':(74,12),'WNBA':(81,12),'NFL':(23,10),'NCAAF':(28,15),'MLB':(4.5,3),'NHL':(3,1.8),'EPL':(1.4,1.3),'MLS':(1.5,1.4)}
 MODEL='opportunity-4.2.0'; ERRORS=[]; CAL_CACHE={}; PLAYER_LOGS={}
-COMPRESSED={'latest.json','history.json','cache.json','ai_picks.json','history-view.json'}
+COMPRESSED={'latest.json','history.json','cache.json','ai_picks.json','history-view.json','pick-record.json'}
 def read(n,d):
  packed=DATA/(n+'.gz')
  if packed.exists():
@@ -579,6 +579,7 @@ def main():
  # No destructive retention of forecast history. Cache excludes bulky raw feed payloads.
  write('events.json',events);write('history.json',history);write('cache.json',cache)
  write('history-view.json',feed_transport.history_view(history))
+ write('pick-record.json',feed_transport.history_view(ai_ledger))
  write('latest.json',feed_transport.compact(report,DATA/'details'))
  write('status.json',{'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'version':MODEL,'refresh_minutes':15,'transport_version':3,'games':len(future),'recommendations':len(rows),'source_errors':len(ERRORS)})
  print(f'{len(future)} upcoming games | {len(rows)} lines | {sum(bool(r.get("player_id")) for r in rows)} player lines | {len(settled)} settled | {len(ERRORS)} feed errors')
