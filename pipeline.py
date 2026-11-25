@@ -131,11 +131,22 @@ def injury_rows(d,e):
   if tid not in teams:continue
   for x in block.get('injuries',[]):
    a=x.get('athlete') or {}
-   if a.get('id') is None:continue
-   out.append({'player_id':str(a['id']),'player':a.get('displayName',''),'team_id':tid,
+   player_id=a.get('id')
+   if player_id is None:
+    for link in a.get('links',[]):
+     if 'playercard' not in link.get('rel',[]):continue
+     match=re.search(r'/_/id/(\d+)(?:/|$)',link.get('href',''))
+     if match:player_id=match.group(1);break
+   if player_id is None:continue
+   out.append({'player_id':str(player_id),'player':a.get('displayName',''),'team_id':tid,
     'position':(a.get('position') or {}).get('abbreviation',''),'status':x.get('status') or 'Unknown',
     'detail':(x.get('details') or {}).get('type',''),'updated':x.get('date'),'event_id':e['id']})
  return out
+
+def injury_date(value):
+ if not value:return dt.datetime.min.replace(tzinfo=dt.timezone.utc)
+ parsed=iso(value)
+ return parsed if parsed.tzinfo else parsed.replace(tzinfo=dt.timezone.utc)
 
 def collect_availability(future):
  # A league-wide injury feed covers reserves omitted from individual game previews.
@@ -150,17 +161,17 @@ def collect_availability(future):
   by_player={}
   for row in injury_rows(league.get(e['sport'],{}),e)+injury_rows(d,e):
    old=by_player.get(row['player_id'])
-   if old is None or (iso(row['updated']) if row['updated'] else dt.datetime.min.replace(tzinfo=dt.timezone.utc))>(iso(old['updated']) if old['updated'] else dt.datetime.min.replace(tzinfo=dt.timezone.utc)) or (
-      iso(row['updated'])==iso(old['updated']) and unavailable(row['status'])):
+   if old is None or injury_date(row['updated'])>injury_date(old['updated']) or (
+      injury_date(row['updated'])==injury_date(old['updated']) and unavailable(row['status'])):
     by_player[row['player_id']]=row
   # Official team reports supplement a missing or delayed injury feed for this fixture.
-  if e['sport']=='NFL' and e['day']=='2026-11-25' and {e['home']['abbr'],e['away']['abbr']}=={'GB','LAR'}:
-   by_player['4426515']={'player_id':'4426515','player':'Puka Nacua','team_id':next(e[s]['id'] for s in ('home','away') if e[s]['abbr']=='LAR'),'position':'WR','status':'Injured Reserve','detail':'Knee and toe injuries','updated':'2026-11-19','event_id':e['id'],'source_url':'https://www.therams.com/news/mcvay-rams-placed-puka-nacua-on-ir-because-they-needed-the-roster-spot-week-10-2026-cardinals'}
-   parsons=by_player.get('4361439') or {'player_id':'4361439','player':'Micah Parsons','team_id':next(e[s]['id'] for s in ('home','away') if e[s]['abbr']=='GB'),'event_id':e['id']}
-   if not parsons.get('updated') or iso(parsons['updated'])<iso('2026-11-24T19:25Z'):
+  if e['sport']=='NFL' and e['day']=='2026-11-25' and {str(e['home']['id']),str(e['away']['id'])}=={'9','14'}:
+   by_player['4426515']={'player_id':'4426515','player':'Puka Nacua','team_id':next(e[s]['id'] for s in ('home','away') if str(e[s]['id'])=='14'),'position':'WR','status':'Injured Reserve','detail':'Knee and toe injuries','updated':'2026-11-19','event_id':e['id'],'source_url':'https://www.therams.com/news/mcvay-rams-placed-puka-nacua-on-ir-because-they-needed-the-roster-spot-week-10-2026-cardinals'}
+   parsons=by_player.get('4361423') or {'player_id':'4361423','player':'Micah Parsons','team_id':next(e[s]['id'] for s in ('home','away') if str(e[s]['id'])=='9'),'event_id':e['id']}
+   if injury_date(parsons.get('updated'))<iso('2026-11-24T19:25Z'):
     parsons.update(status='Questionable',updated='2026-11-24T19:25Z')
    parsons.update(position='EDGE',detail='Activated from PUP; game status and snap count may differ',source_url='https://www.packers.com/news/packers-activate-micah-parsons-off-pup-nov-24-2026')
-   by_player['4361439']=parsons
+   by_player['4361423']=parsons
   all_rows.extend(by_player.values())
  return all_rows
 
