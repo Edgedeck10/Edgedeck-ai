@@ -118,14 +118,84 @@ def parse_box(d,e):
     if r['sport']=='NHL' and k=='Shots on goal' and k in merged[key]['stats']:continue
     merged[key]['stats'][k]=merged[key]['stats'].get(k,0)+v if k=='Touchdowns' else v
  return list(merged.values())
+def unavailable(status):
+ status=re.sub(r'[^a-z]+',' ',str(status).lower()).strip()
+ return status in {'out','doubtful','inactive','ir','pup','suspended','suspension','reserve injured'} or any(
+  term in status for term in ('injured reserve','physically unable','reserve pup','injury reserve','out for season'))
+
 def injury_rows(d,e):
  out=[]
- for block in d.get('injuries',[]):
+ teams={e[s]['id'] for s in ('home','away')}
+ for block in d.get('injuries',[]) or []:
+  tid=str((block.get('team') or {}).get('id') or block.get('id',''))
+  if tid not in teams:continue
   for x in block.get('injuries',[]):
-   a=x.get('athlete',{});out.append({'player_id':str(a.get('id','')),'player':a.get('displayName',''),'team_id':str(block.get('team',{}).get('id','')),'status':x.get('status','Unknown'),'detail':x.get('details',{}).get('type',''),'updated':x.get('date'),'event_id':e['id']})
+   a=x.get('athlete') or {}
+   if a.get('id') is None:continue
+   out.append({'player_id':str(a['id']),'player':a.get('displayName',''),'team_id':tid,
+    'position':(a.get('position') or {}).get('abbreviation',''),'status':x.get('status') or 'Unknown',
+    'detail':(x.get('details') or {}).get('type',''),'updated':x.get('date'),'event_id':e['id']})
  return out
 
+def collect_availability(future):
+ # A league-wide injury feed covers reserves omitted from individual game previews.
+ def league_injuries(sport):
+  return fetch(f'https://site.api.espn.com/apis/site/v2/sports/{SPORTS[sport]}/injuries?limit=1000')
+ league=dict(parallel([(s,league_injuries,(s,)) for s in {g['sport'] for g in future} if s in ('NFL','NBA','WNBA','NHL','MLB')]))
+ previews=dict(parallel([(e['id'],summary,(e,)) for e in future]))
+ all_rows=[]
+ for e in future:
+  d=previews.get(e['id'],{})
+  if not e.get('odds'):e['odds']=d.get('pickcenter',[])
+  by_player={}
+  for row in injury_rows(league.get(e['sport'],{}),e)+injury_rows(d,e):
+   old=by_player.get(row['player_id'])
+   if old is None or (iso(row['updated']) if row['updated'] else dt.datetime.min.replace(tzinfo=dt.timezone.utc))>(iso(old['updated']) if old['updated'] else dt.datetime.min.replace(tzinfo=dt.timezone.utc)) or (
+      iso(row['updated'])==iso(old['updated']) and unavailable(row['status'])):
+    by_player[row['player_id']]=row
+  # Official team reports supplement a missing or delayed injury feed for this fixture.
+  if e['sport']=='NFL' and e['day']=='2026-11-25' and {e['home']['abbr'],e['away']['abbr']}=={'GB','LAR'}:
+   by_player['4426515']={'player_id':'4426515','player':'Puka Nacua','team_id':next(e[s]['id'] for s in ('home','away') if e[s]['abbr']=='LAR'),'position':'WR','status':'Injured Reserve','detail':'Knee and toe injuries','updated':'2026-11-19','event_id':e['id'],'source_url':'https://www.therams.com/news/mcvay-rams-placed-puka-nacua-on-ir-because-they-needed-the-roster-spot-week-10-2026-cardinals'}
+   parsons=by_player.get('4361439') or {'player_id':'4361439','player':'Micah Parsons','team_id':next(e[s]['id'] for s in ('home','away') if e[s]['abbr']=='GB'),'event_id':e['id']}
+   if not parsons.get('updated') or iso(parsons['updated'])<iso('2026-11-24T19:25Z'):
+    parsons.update(status='Questionable',updated='2026-11-24T19:25Z')
+   parsons.update(position='EDGE',detail='Activated from PUP; game status and snap count may differ',source_url='https://www.packers.com/news/packers-activate-micah-parsons-off-pup-nov-24-2026')
+   by_player['4361439']=parsons
+  all_rows.extend(by_player.values())
+ return all_rows
+
 def team_past(events,e,tid):return sorted([g for g in events.values() if g['sport']==e['sport'] and g.get('final') and iso(g.get('start'))<iso(e['start']) and tid in (g['home']['id'],g['away']['id'])],key=lambda g:g['start'])[-20:]
+def injury_impact(events, fixture, boxes, statuses):
+ """Estimate scoring sensitivity from recent, usable team box scores."""
+ if fixture['sport'] not in ('NFL','NCAAF'):return {}
+ result={}
+ for side in ('home','away'):
+  team=fixture[side]
+  games=[]
+  for game in team_past(events,fixture,team['id'])[-12:]:
+   actual=game['home'] if game['home']['id']==team['id'] else game['away']
+   offense=[r for r in boxes.get(game['id'],[]) if r['team_id']==team['id']]
+   if actual.get('score') is not None and any(r['stats'].get('Pass attempts',0) for r in offense):
+    games.append((actual['score'],{r['player_id']:r['stats'] for r in offense}))
+  effects=[]
+  for row in statuses:
+   if row['team_id']!=team['id'] or not unavailable(row['status']):continue
+   pid=row['player_id']
+   present=[(score,players[pid]) for score,players in games if pid in players and
+            any(players[pid].get(key,0) for key in ('Targets','Carries','Pass attempts','Receiving yards'))]
+   absent=[score for score,players in games if pid not in players]
+   if len(present)<3 or len(absent)<3:continue
+   workload=mean([max(s.get('Targets') or 0,s.get('Receptions') or 0)+(s.get('Carries') or 0)+(s.get('Pass attempts') or 0) for _,s in present])
+   if workload<3:continue
+   with_player=mean([score for score,_ in present]);without_player=mean(absent)
+   shrink=min(len(present),len(absent))/(min(len(present),len(absent))+8)
+   # Avoid stacking correlated injury splits or crediting an absence with an offensive boost.
+   delta=clip((without_player-with_player)*len(present)/len(games)*shrink/2,-3,0)
+   effects.append({'player':row['player'],'workload':workload,'with_games':len(present),'without_games':len(absent),
+                   'with_points':with_player,'without_points':without_player,'points':delta})
+  result[side]=min(effects,key=lambda x:x['points'],default={})
+ return result
+
 def team_factors(events,e,side):
  t=e[side];o=e['away' if side=='home' else 'home'];past=team_past(events,e,t['id']);opp=team_past(events,e,o['id']);base,sd=DEFAULTS[e['sport']]
  def scores(gs,tid):
@@ -140,8 +210,9 @@ def team_factors(events,e,side):
  if e['sport'] in ('NBA','WNBA','NCAAB') and rest is not None and rest<.5:mu*=.98
  rest_adjusted=mu
  venue_adjustment=({'NBA':1.5,'NFL':1.0,'NCAAF':1.5}.get(e['sport'],.25))*(1 if side=='home' else -1)
- mu+=venue_adjustment
- return mu,{'team_name':t['name'],'team_id':t['id'],'opponent_name':o['name'],'scoring_average':mean(own,base),'opponent_allowed_average':mean(oppallow,base),'scoring_games':len(own),'opponent_defense_games':len(oppallow),'fallback_scoring':not own,'fallback_defense':not oppallow,'fallback_value':base,'blend':blend,'rest_adjustment':rest_adjusted-blend,'venue_adjustment':venue_adjustment,'projected_score':mu,'source_games':[{'event_id':g['id'],'date':g['start'],'event':g['event'],'home_score':g['home'].get('score'),'away_score':g['away'].get('score'),'home_id':g['home']['id'],'away_id':g['away']['id'],'home_name':g['home']['name'],'away_name':g['away']['name'],'home_periods':g['home'].get('periods',[]),'away_periods':g['away'].get('periods',[]),'source_url':g.get('source_url')} for g in {x['id']:x for x in past+opp}.values()],'games':len(own),'points_for':round(mean(own,base),1),'points_allowed':round(mean(allowed,base),1),'opponent_allowed':round(mean(oppallow,base),1),'rest_days':round(rest,1) if rest is not None else None,'back_to_back':rest is not None and rest<.5,'last5':own[-5:],'sd':max(sd,st.pstdev(own) if len(own)>2 else sd)}
+ availability=e.get('availability_impact',{}).get(side,{})
+ mu+=venue_adjustment+availability.get('points',0)
+ return mu,{'team_name':t['name'],'team_id':t['id'],'opponent_name':o['name'],'scoring_average':mean(own,base),'opponent_allowed_average':mean(oppallow,base),'scoring_games':len(own),'opponent_defense_games':len(oppallow),'fallback_scoring':not own,'fallback_defense':not oppallow,'fallback_value':base,'blend':blend,'rest_adjustment':rest_adjusted-blend,'venue_adjustment':venue_adjustment,'availability_impact':availability,'projected_score':mu,'source_games':[{'event_id':g['id'],'date':g['start'],'event':g['event'],'home_score':g['home'].get('score'),'away_score':g['away'].get('score'),'home_id':g['home']['id'],'away_id':g['away']['id'],'home_name':g['home']['name'],'away_name':g['away']['name'],'home_periods':g['home'].get('periods',[]),'away_periods':g['away'].get('periods',[]),'source_url':g.get('source_url')} for g in {x['id']:x for x in past+opp}.values()],'games':len(own),'points_for':round(mean(own,base),1),'points_allowed':round(mean(allowed,base),1),'opponent_allowed':round(mean(oppallow,base),1),'rest_days':round(rest,1) if rest is not None else None,'back_to_back':rest is not None and rest<.5,'last5':own[-5:],'sd':max(sd,st.pstdev(own) if len(own)>2 else sd)}
 
 def first_touchdown(summary, records):
  """Return the game's first TD, preserving unresolved scorers as unknown."""
@@ -185,7 +256,6 @@ def anytime_touchdowns(events, fixture, boxes, injuries, first_scores=None):
  first_scores=first_scores or {}
  league_prior=2.5 if fixture['sport']=='NFL' else 3.1
  team_rates=[]
- unavailable={'out','doubtful','injured reserve','ir','suspended','suspension','pup'}
  statuses={r['player_id']:r['status'] for r in injuries if r['event_id']==fixture['id']}
  for side,other in (('home','away'),('away','home')):
   team,opponent=fixture[side],fixture[other]
@@ -206,6 +276,7 @@ def anytime_touchdowns(events, fixture, boxes, injuries, first_scores=None):
   own_rate=mean([td_count(rs) for rs in own],league_prior)
   allowed_rate=mean([td_count(rs) for rs in allowed],league_prior)
   scoring=(len(own)*own_rate+len(allowed)*allowed_rate+4*league_prior)/(len(own)+len(allowed)+4)
+  scoring=max(.1,scoring+fixture.get('availability_impact',{}).get(side,{}).get('points',0)/7)
   team_rates.append(scoring)
   if len(own)<3:continue
   history_games=[(g,first_scores[g['id']]) for g in reversed(team_past(events,fixture,team['id'])[-12:])
@@ -225,7 +296,7 @@ def anytime_touchdowns(events, fixture, boxes, injuries, first_scores=None):
   if not total_touches:continue
   for pid,x in usage.items():
    status=statuses.get(pid,'Not listed')
-   if status.strip().lower() in unavailable or x['last_seen']>1 or x['games']<2 or not x['touches']:continue
+   if unavailable(status) or x['last_seen']>1 or x['games']<2 or not x['touches']:continue
    share=(x['tds']+8*x['touches']/total_touches)/(total_td+8)
    if status.strip().lower() in {'questionable','game time decision'}:share*=.85
    rate=scoring*share
@@ -318,7 +389,7 @@ def team_rows(events,e,history):
    mu=mean(values);sig=max(st.pstdev(values),3)
    for side in ('Over','Under'):rows.append(make_row(e,period,side,math.floor(mu)+.5,mu,sig,history,selection=e['event'],sample=len(values),projection_evidence={'kind':'period','samples':values,'mean':mu,'sd':sig},flags=['Unvalidated period model']))
  for r in rows:
-  if 'projection_evidence' not in r:r['projection_evidence']={'kind':'team','home':hf,'away':af,'total':h+a,'home_margin':h-a,'formula':'Each team = (scoring average + opposing points allowed average) / 2 + rest adjustment + venue adjustment','limitations':['Fixed venue and rest coefficients are legacy assumptions, not fitted effects.','No weather, current injury impact, pace, game-script or position-specific adjustment is included.','The model is not prospectively validated.']}
+  if 'projection_evidence' not in r:r['projection_evidence']={'kind':'team','home':hf,'away':af,'total':h+a,'home_margin':h-a,'formula':'Each team = (scoring average + opposing points allowed average) / 2 + rest adjustment + venue adjustment + eligible injury adjustment','limitations':['Fixed venue and rest coefficients are legacy assumptions, not fitted effects.','The injury adjustment uses recent offensive scoring splits where supported. Defensive returns and workload are shown as availability context.','The model is not prospectively validated.']}
  return rows
 
 BASKET={'Points':(5,1),'Rebounds':(2,1),'Assists':(2,1),'PRA':(5,1),'Points + rebounds':(5,1),'Points + assists':(5,1),'Rebounds + assists':(2,1),'Threes':(1,1),'Steals':(1,1),'Blocks':(1,1)}
@@ -341,7 +412,7 @@ def player_rows(events,e,box,injuries,history):
   # Most recent team is the best public-boxscore evidence, current roster gate supplied when available.
   if e.get('roster_ids') and pid not in e['roster_ids']:continue
   status=inj.get(pid,{}).get('status','Not listed')
-  if status.lower() in ('out','suspension','suspended','injured reserve'):continue
+  if unavailable(status):continue
   recent=games[-25:];sid='home' if latest['team_id']==e['home']['id'] else 'away';mu_team,ctx=team_factors(events,e,sid)
   mins=[x['stats']['Minutes'] for x in recent if (x['stats'].get('Minutes') or 0)>0];expected_minutes=.65*mean(mins[-5:])+.35*mean(mins) if mins else None
   if e['sport'] in ('NBA','WNBA','NCAAB') and (expected_minutes is None or expected_minutes<14):continue
@@ -394,7 +465,7 @@ def player_rows(events,e,box,injuries,history):
      for hit in reversed(hits):
       if not hit:break
       streak+=1
-     r=make_row(e,market,side,line,projection,sig,history,player_id=pid,player=latest['player'],selection=latest['player'],team_id=latest['team_id'],sample=len(vals),base_line=base_line,line_step=step,base_line_source='Model projection; sportsbook line unavailable',log_key=log_key,flags=list(flag),source_url=latest['source_url'],injury_status=status,baseline=round(baseline,2),last5=round(last5,2),trend_pct=round((last5/baseline-1)*100,1) if baseline else 0,hit_rate=round(mean(hits),4),last5_hits=sum(hits[-5:]),last10_hits=sum(hits[-10:]),streak=streak,recent_values=vals[-10:],projected_minutes=round(expected_minutes,1) if expected_minutes else None,per_minute=round(rate,3) if rate is not None else None,context={**ctx,'venue':sid,'defense_multiplier':round(defense,3),'teammate_absences':[z['player'] for z in injuries if z['event_id']==e['id'] and z['team_id']==latest['team_id'] and z['status'].lower()=='out']},reasoning='Recent 5 + available season-window form, minutes × per-minute production where available, basketball rest adjustment. Points use opponent team points allowed. Teammate absences flagged; usage redistribution and position-specific defense are not yet modeled.')
+     r=make_row(e,market,side,line,projection,sig,history,player_id=pid,player=latest['player'],selection=latest['player'],team_id=latest['team_id'],sample=len(vals),base_line=base_line,line_step=step,base_line_source='Model projection; sportsbook line unavailable',log_key=log_key,flags=list(flag),source_url=latest['source_url'],injury_status=status,baseline=round(baseline,2),last5=round(last5,2),trend_pct=round((last5/baseline-1)*100,1) if baseline else 0,hit_rate=round(mean(hits),4),last5_hits=sum(hits[-5:]),last10_hits=sum(hits[-10:]),streak=streak,recent_values=vals[-10:],projected_minutes=round(expected_minutes,1) if expected_minutes else None,per_minute=round(rate,3) if rate is not None else None,context={**ctx,'venue':sid,'defense_multiplier':round(defense,3),'teammate_absences':[z['player'] for z in injuries if z['event_id']==e['id'] and z['team_id']==latest['team_id'] and unavailable(z['status'])]},reasoning='Recent 5 + available season-window form, minutes × per-minute production where available, basketball rest adjustment. Points use opponent team points allowed. Teammate absences flagged; usage redistribution and position-specific defense are not yet modeled.')
      if engine:
       estimates=actuarial.price(engine['evidence'],line,side,r.get('odds'));r.update(estimates);r['raw_probability']=r['probability'];r['calibration_games']=0
       r['engine_version']=actuarial.VERSION;r['model_status']='Research / unvalidated';r['qualified']=False
@@ -516,11 +587,7 @@ def main():
    if events[key]['sport'] in ('NFL','NCAAF') and isinstance(d.get('scoringPlays'),list):
     first_scores[key]=first_touchdown(d,rows)
  write('cache.json',cache);write('events.json',events)
- # Pregame summaries supply fresh injury flags and fallback odds snapshots.
- injuries=[]
- for key,d in parallel([(e['id'],summary,(e,)) for e in future[:100]]):
-  e=events[key];injuries+=injury_rows(d,e)
-  if not e.get('odds'):e['odds']=d.get('pickcenter',[])
+ injuries=collect_availability(future)
  write('cache.json',cache);write('events.json',events)
  for r in history+ai_ledger:
   if r.get('outcome') is not None:continue
@@ -536,7 +603,10 @@ def main():
  for key,records in prediction_box.items():
   if records and records[0]['sport'] in ('NFL','NCAAF') and cache['box_schema'].get(key)!=6:
    prediction_box[key]=[{**r,'stats':{k:v for k,v in r['stats'].items() if k!='Receptions'}} for r in records]
+ statuses=defaultdict(list)
+ for row in injuries:statuses[row['event_id']].append(row)
  for e in future:
+  e['availability_impact']=injury_impact(events,e,prediction_box,statuses[e['id']])
   rows+=team_rows(events,e,history);rows+=player_rows(events,e,prediction_box,injuries,history)
  learning=ai_record.calibration(ai_ledger,NOW.isoformat())
  for row in rows:ai_record.apply(row,learning)
@@ -553,7 +623,8 @@ def main():
    snapshot.update({'ai_rank':rank,'ai_selected_at':NOW.isoformat(),'outcome':None,'selection_policy':'game-up-to-ten-v2','calibration_tracking':True})
    ai_ledger.append(snapshot)
  active_ids={e['id'] for e in future}
- ai_selections={eid:ai_record.choose([r for r in ai_ledger if r['event_id']==eid]) for eid in active_ids}
+ inactive={(r['event_id'],r['player_id']) for r in injuries if unavailable(r['status'])}
+ ai_selections={eid:ai_record.choose([r for r in ai_ledger if r['event_id']==eid and (eid,r.get('player_id')) not in inactive]) for eid in active_ids}
  ai_summary=ai_record.summarize(ai_ledger)
  write('ai_picks.json',ai_ledger)
  # Record one pregame forecast for each exact suggested line; never mutate it when refreshing.
