@@ -93,3 +93,24 @@ def summarize(ledger):
  return {'trends':trends,'records':records,'market_diagnostics':diagnostics,'bundles':bundles,'scope':'First published AI top picks per game, prospectively frozen. Not all alternate thresholds or user tickets. No retrospective top-pick reconstruction.'}
 
 
+
+
+def track_calibration(ledger):
+ """Compare the two probabilities frozen together before each game."""
+ groups=defaultdict(list)
+ for row in ledger:
+  if not row.get('calibration_tracking') or not row.get('learning_offset'):continue
+  groups[(row['sport'],row['market'])].append(row)
+ results=[]
+ for (sport,market),rows in sorted(groups.items()):
+  settled=[row for row in rows if row.get('outcome') in (0,1)]
+  def score(field):
+   probabilities=[max(.001,min(.999,row[field]/max(1e-9,1-row.get('push_probability',0)))) for row in settled]
+   outcomes=[row['outcome'] for row in settled]
+   return {'brier':mean([(p-y)**2 for p,y in zip(probabilities,outcomes)]),
+           'log_loss':mean([-math.log(p if y else 1-p) for p,y in zip(probabilities,outcomes)])}
+  results.append({'sport':sport,'market':market,'settled':len(settled),
+   'games':len({row['event_id'] for row in settled}),
+   'pending':sum(row.get('outcome') is None for row in rows),
+   'original':score('raw_ai_probability'),'adjusted':score('probability')})
+ return results
