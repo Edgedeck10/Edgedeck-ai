@@ -17,7 +17,7 @@ NOW=dt.datetime.now(dt.timezone.utc); TODAY=NOW.astimezone(ZoneInfo('America/Ind
 SPORTS={'NBA':'basketball/nba','NFL':'football/nfl','NHL':'hockey/nhl','MLB':'baseball/mlb','NCAAF':'football/college-football','NCAAB':'basketball/mens-college-basketball','WNBA':'basketball/wnba','EPL':'soccer/eng.1','MLS':'soccer/usa.1'}
 DEFAULTS={'NBA':(112,15),'NCAAB':(74,12),'WNBA':(81,12),'NFL':(23,10),'NCAAF':(28,15),'MLB':(4.5,3),'NHL':(3,1.8),'EPL':(1.4,1.3),'MLS':(1.5,1.4)}
 BASE_MODEL='opportunity-4.2.0'
-MODEL='opportunity-4.3.0'
+MODEL='opportunity-4.4.0'
 def model_for(sport):return MODEL if sport in football_weather.SPORTS else BASE_MODEL
 ERRORS=[]; CAL_CACHE={}; PLAYER_LOGS={}
 COMPRESSED={'latest.json','history.json','cache.json','ai_picks.json','history-view.json','pick-record.json'}
@@ -125,7 +125,7 @@ def parse_box(d,e):
  return list(merged.values())
 def unavailable(status):
  status=re.sub(r'[^a-z]+',' ',str(status).lower()).strip()
- return status in {'out','doubtful','inactive','ir','pup','suspended','suspension','reserve injured'} or any(
+ return status in {'out','doubtful','inactive','released','not on current roster','ir','pup','suspended','suspension','reserve injured'} or any(
   term in status for term in ('injured reserve','physically unable','reserve pup','injury reserve','out for season'))
 
 def injury_rows(d,e):
@@ -185,18 +185,62 @@ def collect_availability(future):
  return all_rows
 
 def team_past(events,e,tid):return sorted([g for g in events.values() if g['sport']==e['sport'] and g.get('final') and iso(g.get('start'))<iso(e['start']) and tid in (g['home']['id'],g['away']['id'])],key=lambda g:g['start'])[-20:]
-def injury_impact(events, fixture, boxes, statuses):
- """Estimate scoring sensitivity from recent, usable team box scores."""
- if fixture['sport'] not in ('NFL','NCAAF'):return {}
- result={}
+def football_roster(data):
+ groups=data.get('athletes') or []
+ players={};statuses={}
+ for group in groups:
+  tag=group.get('position','')
+  for athlete in group.get('items',[]) if 'items' in group else [group]:
+   if athlete.get('id') is None:continue
+   pid=str(athlete['id'])
+   players[pid]=athlete.get('displayName') or athlete.get('fullName','')
+   status=(athlete.get('status') or {}).get('name','')
+   if unavailable(status):statuses[pid]=(players[pid],(athlete.get('position') or {}).get('abbreviation',''),status)
+ tags={group.get('position') for group in groups}
+ active_count=sum(len(g.get('items',[])) for g in groups if g.get('position') in ('offense','defense'))
+ # A truncated or one-sided roster cannot establish that a player is gone.
+ return {'players':players,'statuses':statuses,'complete':{'offense','defense'}<=tags and active_count>=40}
+
+def reconcile_football_availability(events, fixture, boxes, statuses):
+ by_player={(r['team_id'],r['player_id']):r for r in statuses}
  for side in ('home','away'):
-  team=fixture[side]
-  games=[]
+  tid=fixture[side]['id'];roster=fixture.get('football_rosters',{}).get(tid,{})
+  def record(pid,name,position,status,detail,source=None):
+   by_player[tid,pid]={'player_id':pid,'player':name,'position':position,'team_id':tid,
+     'status':status,'detail':detail,'event_id':fixture['id'],'source_url':source}
+  for pid,(name,position,status) in roster.get('statuses',{}).items():
+   if not unavailable(by_player.get((tid,pid),{}).get('status')):
+    record(pid,name,position,status,'Current ESPN team roster designation')
+  if roster.get('complete'):
+   for game in team_past(events,fixture,tid)[-4:]:
+    for row in boxes.get(game['id'],[]):
+     pid=row['player_id']
+     if not pid or row['team_id']!=tid or pid in roster['players']:continue
+     if not unavailable(by_player.get((tid,pid),{}).get('status')):
+      record(pid,row['player'],row.get('position') or '', 'Not on current roster',
+        'Recent contributor missing from the verified team roster')
+  if fixture['id']=='NFL:401873083' and tid=='23':
+   record('8439','Aaron Rodgers','QB','Released','Steelers released Rodgers November 25',
+          'https://www.steelers.com/news/steelers-release-rodgers')
+   fixture.setdefault('confirmed_qb',{})[tid]={'player_id':'3116407','player':'Mason Rudolph',
+     'source_url':'https://www.steelers.com/news/statement-from-steelers-spokesman-x8902'}
+   record('3116407','Mason Rudolph','QB','Active','Confirmed starting quarterback for this game',
+          fixture['confirmed_qb'][tid]['source_url'])
+ return list(by_player.values())
+
+def injury_impact(events, fixture, boxes, statuses):
+ """Evaluate reported absences and show when box scores cannot price an impact."""
+ if fixture['sport'] not in football_weather.SPORTS:return {}
+ result={}
+ league_points=DEFAULTS[fixture['sport']][0]
+ for side in ('home','away'):
+  team=fixture[side];games=[]
   for game in team_past(events,fixture,team['id'])[-12:]:
    actual=game['home'] if game['home']['id']==team['id'] else game['away']
    offense=[r for r in boxes.get(game['id'],[]) if r['team_id']==team['id']]
    if actual.get('score') is not None and any(r['stats'].get('Pass attempts',0) for r in offense):
     games.append((actual['score'],{r['player_id']:r['stats'] for r in offense}))
+  confirmed=fixture.get('confirmed_qb',{}).get(team['id'])
   effects=[]
   for row in statuses:
    if row['team_id']!=team['id'] or not unavailable(row['status']):continue
@@ -204,16 +248,32 @@ def injury_impact(events, fixture, boxes, statuses):
    present=[(score,players[pid]) for score,players in games if pid in players and
             any(players[pid].get(key,0) for key in ('Targets','Carries','Pass attempts','Receiving yards'))]
    absent=[score for score,players in games if pid not in players]
-   if len(present)<3 or len(absent)<3:continue
    workload=mean([max(s.get('Targets') or 0,s.get('Receptions') or 0)+(s.get('Carries') or 0)+(s.get('Pass attempts') or 0) for _,s in present])
-   if workload<3:continue
-   with_player=mean([score for score,_ in present]);without_player=mean(absent)
-   shrink=min(len(present),len(absent))/(min(len(present),len(absent))+8)
-   # Avoid stacking correlated injury splits or crediting an absence with an offensive boost.
-   delta=clip((without_player-with_player)*len(present)/len(games)*shrink/2,-3,0)
-   effects.append({'player':row['player'],'workload':workload,'with_games':len(present),'without_games':len(absent),
-                   'with_points':with_player,'without_points':without_player,'points':delta})
-  result[side]=min(effects,key=lambda x:x['points'],default={})
+   is_primary=any((players.get(pid,{}).get('Pass attempts') or 0)>=12 for _,players in games[-3:])
+   effect={'player':row['player'],'status':row['status'],'position':row.get('position'),
+      'workload':workload,'with_games':len(present),'without_games':len(absent),
+      'with_points':mean([score for score,_ in present],None),'without_points':mean(absent,None),
+      'points':None,'uncertainty':0,'method':'Insufficient offensive usage or participation data'}
+   if len(present)>=3 and len(absent)>=3 and workload>=3:
+    shrink=min(len(present),len(absent))/(min(len(present),len(absent))+8)
+    effect['points']=clip((effect['without_points']-effect['with_points'])*len(present)/len(games)*shrink/2,-3,0)
+    effect['method']='Shrunk descriptive scoring split'
+   elif is_primary and games:
+    # A QB change weakens reliance on scoring history with the prior passer.
+    # Shrink toward the league scoring prior and widen uncertainty without inventing a replacement rating.
+    historical=mean([score for score,_ in games])
+    effect.update(points=clip(.15*(league_points-historical),-2,2),uncertainty=.12,
+      method='Prior starting QB unavailable; team scoring regressed toward league baseline')
+   effects.append(effect)
+  scoring=[x for x in effects if x['points'] is not None]
+  qb=next((x for x in sorted(scoring,key=lambda x:-x['workload']) if x['position']=='QB' or x['uncertainty']),None)
+  others=[x for x in scoring if x is not qb]
+  # Downweight overlapping splits, retaining smaller effects across distinct unavailable players.
+  deltas=sorted((x['points'] for x in others))
+  points=(qb['points'] if qb else 0)+(deltas[0]+.35*sum(deltas[1:]) if deltas else 0)
+  lead=qb or min(scoring,key=lambda x:x['points'],default={})
+  result[side]={**lead,'points':clip(points,-4,3),'players':effects,'quantified':len(scoring),
+     'uncertainty':max((r['uncertainty'] for r in effects),default=0),'confirmed_qb':confirmed}
  return result
 
 def team_factors(events,e,side):
@@ -233,7 +293,7 @@ def team_factors(events,e,side):
  availability=e.get('availability_impact',{}).get(side,{})
  mu+=venue_adjustment+availability.get('points',0)
  weather_points=mu*(e.get('weather',{}).get('scoring',1)-1);mu+=weather_points
- return mu,{'team_name':t['name'],'team_id':t['id'],'opponent_name':o['name'],'scoring_average':mean(own,base),'opponent_allowed_average':mean(oppallow,base),'scoring_games':len(own),'opponent_defense_games':len(oppallow),'fallback_scoring':not own,'fallback_defense':not oppallow,'fallback_value':base,'blend':blend,'rest_adjustment':rest_adjusted-blend,'venue_adjustment':venue_adjustment,'availability_impact':availability,'weather_adjustment':weather_points,'projected_score':mu,'source_games':[{'event_id':g['id'],'date':g['start'],'event':g['event'],'home_score':g['home'].get('score'),'away_score':g['away'].get('score'),'home_id':g['home']['id'],'away_id':g['away']['id'],'home_name':g['home']['name'],'away_name':g['away']['name'],'home_periods':g['home'].get('periods',[]),'away_periods':g['away'].get('periods',[]),'source_url':g.get('source_url')} for g in {x['id']:x for x in past+opp}.values()],'games':len(own),'points_for':round(mean(own,base),1),'points_allowed':round(mean(allowed,base),1),'opponent_allowed':round(mean(oppallow,base),1),'rest_days':round(rest,1) if rest is not None else None,'back_to_back':rest is not None and rest<.5,'last5':own[-5:],'sd':max(sd,st.pstdev(own) if len(own)>2 else sd)}
+ return mu,{'team_name':t['name'],'team_id':t['id'],'opponent_name':o['name'],'scoring_average':mean(own,base),'opponent_allowed_average':mean(oppallow,base),'scoring_games':len(own),'opponent_defense_games':len(oppallow),'fallback_scoring':not own,'fallback_defense':not oppallow,'fallback_value':base,'blend':blend,'rest_adjustment':rest_adjusted-blend,'venue_adjustment':venue_adjustment,'availability_impact':availability,'weather_adjustment':weather_points,'projected_score':mu,'source_games':[{'event_id':g['id'],'date':g['start'],'event':g['event'],'home_score':g['home'].get('score'),'away_score':g['away'].get('score'),'home_id':g['home']['id'],'away_id':g['away']['id'],'home_name':g['home']['name'],'away_name':g['away']['name'],'home_periods':g['home'].get('periods',[]),'away_periods':g['away'].get('periods',[]),'source_url':g.get('source_url')} for g in {x['id']:x for x in past+opp}.values()],'games':len(own),'points_for':round(mean(own,base),1),'points_allowed':round(mean(allowed,base),1),'opponent_allowed':round(mean(oppallow,base),1),'rest_days':round(rest,1) if rest is not None else None,'back_to_back':rest is not None and rest<.5,'last5':own[-5:],'sd':max(sd,st.pstdev(own) if len(own)>2 else sd)*(1+availability.get('uncertainty',0))}
 
 def first_touchdown(summary, records):
  """Return the game's first TD, preserving unresolved scorers as unknown."""
@@ -411,7 +471,7 @@ def team_rows(events,e,history):
    mu=mean(values)*e.get('weather',{}).get('scoring',1);sig=max(st.pstdev(values),3)
    for side in ('Over','Under'):rows.append(make_row(e,period,side,math.floor(mu)+.5,mu,sig,history,selection=e['event'],sample=len(values),projection_evidence={'kind':'period','samples':values,'mean':mu,'sd':sig,'weather_adjustment':mu-mean(values)},flags=['Unvalidated period model']))
  for r in rows:
-  if 'projection_evidence' not in r:r['projection_evidence']={'kind':'team','home':hf,'away':af,'total':h+a,'home_margin':h-a,'formula':'Each team = (scoring average + opposing points allowed average) / 2 + rest adjustment + venue adjustment + eligible injury adjustment, then kickoff weather scoring adjustment where available','limitations':['Fixed venue and rest coefficients are legacy assumptions, not fitted effects.','The injury adjustment uses recent offensive scoring splits where supported. Defensive returns and workload are shown as availability context.','The model is not prospectively validated.']}
+  if 'projection_evidence' not in r:r['projection_evidence']={'kind':'team','home':hf,'away':af,'total':h+a,'home_margin':h-a,'formula':'Each team = (scoring average + opposing points allowed average) / 2 + rest adjustment + venue adjustment + eligible injury adjustment, then kickoff weather scoring adjustment where available','limitations':['Fixed venue and rest coefficients are legacy assumptions, not fitted effects.','All reported absences are reviewed. Where recent offensive scoring splits are usable, overlapping estimates are downweighted. Starting quarterback changes with thin evidence can move the forecast toward baseline and widen uncertainty. Defensive and offensive-line absence effects require participation data.','The model is not prospectively validated.']}
  return rows
 
 BASKET={'Points':(5,1),'Rebounds':(2,1),'Assists':(2,1),'PRA':(5,1),'Points + rebounds':(5,1),'Points + assists':(5,1),'Rebounds + assists':(2,1),'Threes':(1,1),'Steals':(1,1),'Blocks':(1,1)}
@@ -433,6 +493,8 @@ def player_rows(events,e,box,injuries,history):
   if latest['team_id'] not in tidset or (NOW-iso(latest['start'])).days>45:continue
   # Most recent team is the best public-boxscore evidence, current roster gate supplied when available.
   if e.get('roster_ids') and pid not in e['roster_ids']:continue
+  current=e.get('football_rosters',{}).get(latest['team_id'],{})
+  if current.get('complete') and pid not in current['players']:continue
   status=inj.get(pid,{}).get('status','Not listed')
   if unavailable(status):continue
   recent=games[-25:];sid='home' if latest['team_id']==e['home']['id'] else 'away';mu_team,ctx=team_factors(events,e,sid)
@@ -578,13 +640,27 @@ def main():
  jobs=[]
  for sport,tid in teams:
   key=sport+':'+tid
-  if sport in ('NBA','WNBA','NCAAB') and cache['rosters'].get(key,{}).get('day')!=TODAY.isoformat():jobs.append((key,roster,(sport,tid)))
+  if sport in football_weather.SPORTS:
+   saved=cache['rosters'].get(key,{})
+   if NOW-iso(saved.get('fetched_at'))>=dt.timedelta(hours=1):jobs.append((key,roster,(sport,tid)))
+  elif sport in ('NBA','WNBA','NCAAB') and cache['rosters'].get(key,{}).get('day')!=TODAY.isoformat():jobs.append((key,roster,(sport,tid)))
  for key,d in parallel(jobs):
+  if key.split(':')[0] in football_weather.SPORTS:
+   data=football_roster(d)
+   if data['complete'] or (data['players'] and not cache['rosters'].get(key,{}).get('complete')):
+    cache['rosters'][key]={**data,'fetched_at':NOW.isoformat()}
+   continue
   athletes=d.get('athletes',[]);ids=[str(a['id']) for a in athletes if 'id' in a]
   if ids:cache['rosters'][key]={'day':TODAY.isoformat(),'ids':ids}
  for e in future:
   ids=sum([cache['rosters'].get(e['sport']+':'+e[s]['id'],{}).get('ids',[]) for s in ('home','away')],[])
   if ids:e['roster_ids']=ids
+  if e['sport'] in football_weather.SPORTS:
+   e['football_rosters']={}
+   for side in ('home','away'):
+    tid=e[side]['id'];saved=cache['rosters'].get(e['sport']+':'+tid,{})
+    if saved.get('fetched_at') and NOW-iso(saved['fetched_at'])<dt.timedelta(hours=2):
+     e['football_rosters'][tid]=saved
  # Old football reception grades used a parser that conflated catches and recoveries.
  # Preserve the original grade for audit and verify it again against a refreshed box.
  for r in history+ai_ledger:
@@ -636,9 +712,14 @@ def main():
    prediction_box[key]=[{**r,'stats':{k:v for k,v in r['stats'].items() if k!='Receptions'}} for r in records]
  statuses=defaultdict(list)
  for row in injuries:statuses[row['event_id']].append(row)
+ injuries=[row for row in injuries if row['event_id'] not in {e['id'] for e in future if e['sport'] in football_weather.SPORTS}]
  for e in future:
+  if e['sport'] in football_weather.SPORTS:
+   statuses[e['id']]=reconcile_football_availability(events,e,prediction_box,statuses[e['id']])
+   injuries.extend(statuses[e['id']])
   e['availability_impact']=injury_impact(events,e,prediction_box,statuses[e['id']])
-  rows+=team_rows(events,e,history);rows+=player_rows(events,e,prediction_box,injuries,history)
+  rows+=team_rows(events,e,history);rows+=player_rows(events,e,prediction_box,statuses[e['id']],history)
+  e.pop('football_rosters',None)
  learning=ai_record.calibration(ai_ledger,NOW.isoformat(),model_for)
  for row in rows:ai_record.apply(row,learning)
  by_event=defaultdict(list)

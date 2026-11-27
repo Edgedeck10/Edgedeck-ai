@@ -115,3 +115,26 @@ class KickoffWeatherRegression(unittest.TestCase):
   self.assertEqual([g['weather']['roof'] for g in games[2:4]],['indoor','unknown'])
   for game in games[2:]:
    self.assertEqual(weather.market_factors('Passing yards',game['weather']),(1,1))
+
+
+class FootballAvailabilityRegression(unittest.TestCase):
+ def test_confirmed_release_marks_prior_starter_and_revises_team_prior(self):
+  fixture={'id':'NFL:401873083','sport':'NFL','start':'2026-11-27T20:00Z',
+           'home':{'id':'23','name':'Steelers'},'away':{'id':'7','name':'Broncos'}}
+  events={};boxes={}
+  for day in range(14,18):
+   eid=f'NFL:{day}'
+   events[eid]={'id':eid,'sport':'NFL','start':f'2026-11-{day}T20:00Z','final':True,'event':'Past game',
+                'home':{'id':'23','name':'Steelers','score':30},'away':{'id':'7','name':'Broncos','score':20}}
+   boxes[eid]=[{'team_id':'23','player_id':'8439','stats':{'Pass attempts':32}}]
+  defense={'team_id':'23','player_id':'def','player':'Defensive player','position':'LB','status':'Inactive'}
+  rows=p.reconcile_football_availability(events,fixture,boxes,[defense])
+  effects=p.injury_impact(events,fixture,boxes,rows)
+  self.assertEqual(effects['home']['confirmed_qb']['player'],'Mason Rudolph')
+  self.assertEqual(effects['home']['players'][0]['status'],'Inactive')
+  self.assertIsNone(effects['home']['players'][0]['points'])
+  self.assertLess(effects['home']['points'],0)
+  self.assertGreater(effects['home']['uncertainty'],0)
+  baseline=p.team_factors(events,fixture,'home')[0]
+  fixture['availability_impact']=effects
+  self.assertLess(p.team_factors(events,fixture,'home')[0],baseline)
