@@ -65,7 +65,7 @@ def history_window(ps):
   errors.append(abs(ps[i][1]-mu))
  return {'selected_games':selected,'available_games':n,'candidate_mae':{str(k):round(v,3) if v is not None else None for k,v in scores.items()},'evaluation_games':len(hold),'holdout_mae':round(avg(errors),3) if errors else None,'selection_status':'Chronological comparison' if eligible else 'Insufficient chronological origins; baseline window used','scope':'Chronological opportunity-mean window comparison only; not full model or selection validation'}
 
-def fit(records,peers,sport,market,pid,key,adjustment=1):
+def fit(records,peers,sport,market,pid,key,adjustment=1,weather_volume=1,weather_rate=1):
  ps,unit,family=pairs_for(records,sport,market)
  fallback=False
  if len(ps)<5:
@@ -86,7 +86,10 @@ def fit(records,peers,sport,market,pid,key,adjustment=1):
  if family=='finite':shrunk=(sum(ys)+.5)/(sum(xs)+1)
  elif family=='count' and not prior:shrunk=(sum(ys)+.5)/sum(xs)
  workloads=[quantile(xs,.1),avg(xs),quantile(xs,.9)]
- histograms=[distribution(family,shrunk*x*adjustment,x,k,residual_sd) for x in workloads]
+ # A per-game fallback adjusts the per-game mean while preserving one game of exposure.
+ rate_multiplier=adjustment*weather_rate*(weather_volume if unit=='Games' else 1)
+ if unit!='Games':workloads=[x*weather_volume for x in workloads]
+ histograms=[distribution(family,shrunk*x*rate_multiplier,x,k,residual_sd) for x in workloads]
  mix=defaultdict(float)
  for weight,h in zip((.25,.5,.25),histograms):
   for y,p in h.items():mix[float(y)]+=weight*p
@@ -97,12 +100,12 @@ def fit(records,peers,sport,market,pid,key,adjustment=1):
    total+=p
    if total>=q:return y
   return max(mix)
- missing=['Confirmed lineup / role changes','Position-specific defense','Weather / game-script adjustment','Closing-line history']
+ missing=['Confirmed lineup / role changes','Position-specific defense','Game-script and player-specific weather response','Closing-line history']
  if sport in ('NBA','WNBA','NCAAB'):missing+=['Potential assists / rebound chances','On-off usage / pace']
  if sport in ('NFL','NCAAF'):missing+=['Routes / snap share / air yards / EPA','Individual-play severity data; yardage variance is aggregate approximation']
  if sport in ('EPL','MLS'):missing+=['xG / xA / possession']
  if sport=='NHL':missing+=['Power-play deployment / confirmed goalie']
- evidence={'engine':VERSION,'method':{'finite':'Binomial production','signed':'Rounded signed Gaussian yardage','count':'Negative-binomial production' if k else 'Poisson production'}[family]+' with low / normal / high workload scenarios', 'opportunity_unit':unit,'expected_opportunity':round(avg(xs),3),'observed_rate':round(rate,4),'shrunk_rate':round(shrunk,4),'credibility_weight':round(z,4),'credibility_fit':prior,'history_window':window,'adjustment':round(adjustment,4),'median':mq(.5),'outcome_range_80':[mq(.1),mq(.9)],'workload_range_80':[round(workloads[0],2),round(workloads[2],2)],'workload_scenarios':[{'label':label,'opportunity':round(x,3),'weight':w} for label,x,w in zip(('Low','Normal','High'),workloads,(.25,.5,.25))],'scenario_weights':[.25,.5,.25],'negative_binomial_k':round(k,4) if k else None,'fallback':fallback,'missing_inputs':missing,'status':'Research model; not prospectively validated','uncertainty_note':'Probability range is sensitivity to three workloads, not a credible interval. Scenario weights 25/50/25 are assumptions, not learned likelihoods. Parameter uncertainty and omitted matchup factors are not quantified.','draw_histograms':histograms,'simulations_per_draw':0,'sample_games':len(ps),'training_end':ps[-1][0]['start']}
+ evidence={'engine':VERSION,'method':{'finite':'Binomial production','signed':'Rounded signed Gaussian yardage','count':'Negative-binomial production' if k else 'Poisson production'}[family]+' with low / normal / high workload scenarios', 'opportunity_unit':unit,'expected_opportunity':round(avg(workloads) if unit=='Games' else avg(xs)*weather_volume,3),'observed_rate':round(rate,4),'shrunk_rate':round(shrunk,4),'credibility_weight':round(z,4),'credibility_fit':prior,'history_window':window,'adjustment':round(adjustment,4),'median':mq(.5),'outcome_range_80':[mq(.1),mq(.9)],'workload_range_80':[round(workloads[0],2),round(workloads[2],2)],'workload_scenarios':[{'label':label,'opportunity':round(x,3),'weight':w} for label,x,w in zip(('Low','Normal','High'),workloads,(.25,.5,.25))],'scenario_weights':[.25,.5,.25],'negative_binomial_k':round(k,4) if k else None,'fallback':fallback,'missing_inputs':missing,'status':'Research model; not prospectively validated','uncertainty_note':'Probability range is sensitivity to three workloads, not a credible interval. Scenario weights 25/50/25 are assumptions, not learned likelihoods. Parameter uncertainty and omitted matchup factors are not quantified.','draw_histograms':histograms,'simulations_per_draw':0,'sample_games':len(ps),'training_end':ps[-1][0]['start']}
  return {'projection':mean,'sd':sd,'evidence':evidence}
 
 def distribution(family,mu,workload,k,residual_sd):

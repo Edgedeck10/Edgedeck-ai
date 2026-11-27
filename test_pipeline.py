@@ -23,7 +23,7 @@ class PipelineTest(unittest.TestCase):
   self.assertAlmostEqual(a['probability']+b['probability'],1)
   self.assertAlmostEqual(p.implied(-150),.6);self.assertEqual(p.fair(.5),-100)
  def test_calibration(self):
-  h={'event_id':'NBA:old','model_version':p.MODEL,'calibration_key':'NBA:Points:Over','market':'Points','side':'Over','outcome':1,'raw_probability':.6}
+  h={'event_id':'NBA:old','model_version':p.model_for('NBA'),'calibration_key':'NBA:Points:Over','market':'Points','side':'Over','outcome':1,'raw_probability':.6}
   result,n=p.calibrate([h],h['calibration_key'],.6);self.assertGreater(result,.6);self.assertEqual(n,1)
  def test_schedule_score_objects(self):self.assertEqual(p.num({'value':117}),117)
 if __name__=='__main__':unittest.main()
@@ -70,3 +70,48 @@ class LazyFeedRegression(unittest.TestCase):
    self.assertEqual(payload['distributions'][mid],model['draw_histograms'])
    self.assertIn('frozen_model',source['ai_selections']['e'][0])
    self.assertNotIn('frozen_model',compact['ai_selections']['e'][0])
+
+
+class KickoffWeatherRegression(unittest.TestCase):
+ def test_forecast_affects_both_leagues_and_keeps_unconfirmed_roofs_neutral(self):
+  from datetime import datetime, timezone
+  from urllib.parse import urlparse, parse_qs
+  import football_weather as weather
+  venue={'name':'Test Stadium','lat':42.8,'lon':-78.8,'indoor':False}
+  start='2026-11-27T01:20Z'
+  games=[{'id':sport,'sport':sport,'start':start,'venue':venue} for sport in ('NFL','NCAAF')]
+  games += [
+   {'id':'dome','sport':'NFL','start':start,'venue':{**venue,'indoor':True}},
+   {'id':'retractable','sport':'NFL','start':start,'venue':{**venue,'name':'AT&T Stadium'}},
+   {'id':'late','sport':'NCAAF','start':'2026-11-28T01:20Z','venue':venue},
+  ]
+  calls=[]
+  def fetch(url):
+   calls.append(url)
+   self.assertIn('wind_gusts_10m',parse_qs(urlparse(url).query)['hourly'][0])
+   return {'hourly':{'time':['2026-11-27T01:00','2026-11-27T02:00'],
+    'temperature_2m':[38,35],'wind_speed_10m':[15,18],'wind_gusts_10m':[25,35],'precipitation':[0,2.5]}}
+  cache={}
+  now=datetime(2026,11,27,tzinfo=timezone.utc)
+  weather.collect(games,cache,fetch,p.parallel,now)
+  self.assertEqual(len(calls),1)
+  for game in games[:2]:
+   wx=game['weather']
+   self.assertEqual((wx['status'],wx['temperature_f'],wx['wind_mph'],wx['gust_mph'],wx['precip_mm']),
+                    ('Kickoff forecast used',37,16,35,2.5))
+   self.assertLess(wx['pass_efficiency'],1)
+   self.assertLess(weather.market_factors('Receiving yards',wx)[0],1)
+   self.assertGreater(weather.market_factors('Rushing yards',wx)[0],1)
+   game.update(home={'id':'h','name':'Home'},away={'id':'a','name':'Away'})
+   _, evidence=p.team_factors({},game,'home')
+   self.assertLess(evidence['weather_adjustment'],0)
+   rows=[{'start':f'2026-11-{d:02d}T12:00Z','stats':{'Passing yards':230+d,'Pass attempts':32}}
+         for d in range(1,11)]
+   calm=p.actuarial.fit(rows,{},game['sport'],'Passing yards','p','p')
+   wet=p.actuarial.fit(rows,{},game['sport'],'Passing yards','p','p',weather_volume=wx['pass_volume'],weather_rate=wx['pass_efficiency'])
+   self.assertLess(wet['projection'],calm['projection'])
+   self.assertLess(p.actuarial.price(wet['evidence'],225.5,'Over')['probability'],
+                   p.actuarial.price(calm['evidence'],225.5,'Over')['probability'])
+  self.assertEqual([g['weather']['roof'] for g in games[2:4]],['indoor','unknown'])
+  for game in games[2:]:
+   self.assertEqual(weather.market_factors('Passing yards',game['weather']),(1,1))

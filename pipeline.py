@@ -11,11 +11,15 @@ import matchup
 import ai_record
 import nextgen
 import feed_transport
+import football_weather
 ROOT=pathlib.Path(__file__).parent; DATA=ROOT/'data'/'classic'; DATA.mkdir(parents=True,exist_ok=True)
 NOW=dt.datetime.now(dt.timezone.utc); TODAY=NOW.astimezone(ZoneInfo('America/Indiana/Indianapolis')).date()
 SPORTS={'NBA':'basketball/nba','NFL':'football/nfl','NHL':'hockey/nhl','MLB':'baseball/mlb','NCAAF':'football/college-football','NCAAB':'basketball/mens-college-basketball','WNBA':'basketball/wnba','EPL':'soccer/eng.1','MLS':'soccer/usa.1'}
 DEFAULTS={'NBA':(112,15),'NCAAB':(74,12),'WNBA':(81,12),'NFL':(23,10),'NCAAF':(28,15),'MLB':(4.5,3),'NHL':(3,1.8),'EPL':(1.4,1.3),'MLS':(1.5,1.4)}
-MODEL='opportunity-4.2.0'; ERRORS=[]; CAL_CACHE={}; PLAYER_LOGS={}
+BASE_MODEL='opportunity-4.2.0'
+MODEL='opportunity-4.3.0'
+def model_for(sport):return MODEL if sport in football_weather.SPORTS else BASE_MODEL
+ERRORS=[]; CAL_CACHE={}; PLAYER_LOGS={}
 COMPRESSED={'latest.json','history.json','cache.json','ai_picks.json','history-view.json','pick-record.json'}
 def read(n,d):
  packed=DATA/(n+'.gz')
@@ -66,9 +70,10 @@ def event(e,sport):
  status=(c.get('status') or e.get('status') or {}).get('type',{})
  def team(t):
   x=t.get('team',{});return {'id':str(x.get('id',t.get('id',''))),'name':x.get('displayName',''),'abbr':x.get('abbreviation',''),'logo':x.get('logo'),'score':num(t.get('score')),'periods':[num(z.get('value')) for z in t.get('linescores',[])],'stats':{z['name']:num(z.get('displayValue')) for z in t.get('statistics',[]) if z.get('name')},'record':next((z.get('summary') for z in t.get('records',[]) if z.get('type')=='total'),None)}
- return {'id':sport+':'+str(e['id']),'espn_id':str(e['id']),'sport':sport,'event':e.get('name',''),'start':e.get('date'),'day':iso(e.get('date')).astimezone(ZoneInfo('America/Indiana/Indianapolis')).date().isoformat(),'home':team(sides['home']),'away':team(sides['away']),'final':bool(status.get('completed')),'state':status.get('state','pre'),'status':status.get('description',''),'odds':c.get('odds',[]),'source_url':next((x['href'] for x in e.get('links',[]) if 'summary' in x.get('rel',[])),f'https://www.espn.com/{SPORTS[sport].split("/")[1]}/game/_/gameId/{e["id"]}')}
+ return {'id':sport+':'+str(e['id']),'espn_id':str(e['id']),'sport':sport,'event':e.get('name',''),'start':e.get('date'),'day':iso(e.get('date')).astimezone(ZoneInfo('America/Indiana/Indianapolis')).date().isoformat(),'home':team(sides['home']),'away':team(sides['away']),'final':bool(status.get('completed')),'state':status.get('state','pre'),'status':status.get('description',''),'odds':c.get('odds',[]),'venue':football_weather.venue_fields(c.get('venue')) if sport in football_weather.SPORTS else None,'source_url':next((x['href'] for x in e.get('links',[]) if 'summary' in x.get('rel',[])),f'https://www.espn.com/{SPORTS[sport].split("/")[1]}/game/_/gameId/{e["id"]}')}
 def scoreboard(sport,day):
- d=fetch(f'https://site.api.espn.com/apis/site/v2/sports/{SPORTS[sport]}/scoreboard?dates={day.replace("-","")}&limit=200')
+ division="&groups=90" if sport=="NCAAF" else ""
+ d=fetch(f'https://site.api.espn.com/apis/site/v2/sports/{SPORTS[sport]}/scoreboard?dates={day.replace("-","")}&limit=200{division}')
  return [x for e in d.get('events',[]) if (x:=event(e,sport))]
 def schedule(sport,team):return fetch(f'https://site.api.espn.com/apis/site/v2/sports/{SPORTS[sport]}/teams/{team}/schedule')
 def summary(e):return fetch(f'https://site.api.espn.com/apis/site/v2/sports/{SPORTS[e["sport"]]}/summary?event={e["espn_id"]}')
@@ -158,6 +163,10 @@ def collect_availability(future):
  for e in future:
   d=previews.get(e['id'],{})
   if not e.get('odds'):e['odds']=d.get('pickcenter',[])
+  if e['sport'] in football_weather.SPORTS:
+   venue=football_weather.venue_fields((d.get('gameInfo') or {}).get('venue'))
+   # Only merge fields from this game's venue, including neutral-site games.
+   e['venue']={**(e.get('venue') or {}),**{k:v for k,v in venue.items() if v is not None}}
   by_player={}
   for row in injury_rows(league.get(e['sport'],{}),e)+injury_rows(d,e):
    old=by_player.get(row['player_id'])
@@ -223,7 +232,8 @@ def team_factors(events,e,side):
  venue_adjustment=({'NBA':1.5,'NFL':1.0,'NCAAF':1.5}.get(e['sport'],.25))*(1 if side=='home' else -1)
  availability=e.get('availability_impact',{}).get(side,{})
  mu+=venue_adjustment+availability.get('points',0)
- return mu,{'team_name':t['name'],'team_id':t['id'],'opponent_name':o['name'],'scoring_average':mean(own,base),'opponent_allowed_average':mean(oppallow,base),'scoring_games':len(own),'opponent_defense_games':len(oppallow),'fallback_scoring':not own,'fallback_defense':not oppallow,'fallback_value':base,'blend':blend,'rest_adjustment':rest_adjusted-blend,'venue_adjustment':venue_adjustment,'availability_impact':availability,'projected_score':mu,'source_games':[{'event_id':g['id'],'date':g['start'],'event':g['event'],'home_score':g['home'].get('score'),'away_score':g['away'].get('score'),'home_id':g['home']['id'],'away_id':g['away']['id'],'home_name':g['home']['name'],'away_name':g['away']['name'],'home_periods':g['home'].get('periods',[]),'away_periods':g['away'].get('periods',[]),'source_url':g.get('source_url')} for g in {x['id']:x for x in past+opp}.values()],'games':len(own),'points_for':round(mean(own,base),1),'points_allowed':round(mean(allowed,base),1),'opponent_allowed':round(mean(oppallow,base),1),'rest_days':round(rest,1) if rest is not None else None,'back_to_back':rest is not None and rest<.5,'last5':own[-5:],'sd':max(sd,st.pstdev(own) if len(own)>2 else sd)}
+ weather_points=mu*(e.get('weather',{}).get('scoring',1)-1);mu+=weather_points
+ return mu,{'team_name':t['name'],'team_id':t['id'],'opponent_name':o['name'],'scoring_average':mean(own,base),'opponent_allowed_average':mean(oppallow,base),'scoring_games':len(own),'opponent_defense_games':len(oppallow),'fallback_scoring':not own,'fallback_defense':not oppallow,'fallback_value':base,'blend':blend,'rest_adjustment':rest_adjusted-blend,'venue_adjustment':venue_adjustment,'availability_impact':availability,'weather_adjustment':weather_points,'projected_score':mu,'source_games':[{'event_id':g['id'],'date':g['start'],'event':g['event'],'home_score':g['home'].get('score'),'away_score':g['away'].get('score'),'home_id':g['home']['id'],'away_id':g['away']['id'],'home_name':g['home']['name'],'away_name':g['away']['name'],'home_periods':g['home'].get('periods',[]),'away_periods':g['away'].get('periods',[]),'source_url':g.get('source_url')} for g in {x['id']:x for x in past+opp}.values()],'games':len(own),'points_for':round(mean(own,base),1),'points_allowed':round(mean(allowed,base),1),'opponent_allowed':round(mean(oppallow,base),1),'rest_days':round(rest,1) if rest is not None else None,'back_to_back':rest is not None and rest<.5,'last5':own[-5:],'sd':max(sd,st.pstdev(own) if len(own)>2 else sd)}
 
 def first_touchdown(summary, records):
  """Return the game's first TD, preserving unresolved scorers as unknown."""
@@ -288,6 +298,7 @@ def anytime_touchdowns(events, fixture, boxes, injuries, first_scores=None):
   allowed_rate=mean([td_count(rs) for rs in allowed],league_prior)
   scoring=(len(own)*own_rate+len(allowed)*allowed_rate+4*league_prior)/(len(own)+len(allowed)+4)
   scoring=max(.1,scoring+fixture.get('availability_impact',{}).get(side,{}).get('points',0)/7)
+  scoring*=fixture.get('weather',{}).get('scoring',1)
   team_rates.append(scoring)
   if len(own)<3:continue
   history_games=[(g,first_scores[g['id']]) for g in reversed(team_past(events,fixture,team['id'])[-12:])
@@ -334,7 +345,7 @@ def calibrate(history,key,p):
   adj,n=CAL_CACHE[cache_key];return clip(p+adj),n
  groups={}
  for h in history:
-  if h.get('model_version')!=MODEL or h.get('calibration_key')!=key or h.get('outcome') not in (0,1):continue
+  if h.get('model_version')!=model_for(key.split(':',1)[0]) or h.get('calibration_key')!=key or h.get('outcome') not in (0,1):continue
   groups.setdefault((h['event_id'],h.get('player_id'),h.get('market'),h.get('side')),h)
  rows=list(groups.values())[-500:];n=len(rows)
  adj=clip(mean([r['outcome']-r['raw_probability'] for r in rows]),-.08,.08)*n/(n+100) if n else 0
@@ -349,8 +360,8 @@ def make_row(e,market,side,line,mu,sd,history,**extra):
   raw=1-cdf(line,mu,sd) if side=='Over' else cdf(line,mu,sd)
  raw=clip(raw,.025,.975);key=e['sport']+':'+market+':'+side
  p,n=calibrate(history,key,raw);odds=extra.get('odds');priced=odds is not None and abs(odds)>=100
- identifier='|'.join(str(x) for x in (MODEL,e['id'],extra.get('player_id','team'),market,extra.get('selection',''),side,line))
- row={'id':identifier,'event_id':e['id'],'sport':e['sport'],'event':e['event'],'start':e['start'],'day':e['day'],'market':market,'side':side,'line':line,'projection':round(mu,2),'sd':round(sd,2),'raw_probability':round(raw,5),'probability':round(p,5),'fair_odds':fair(p),'calibration_key':key,'calibration_games':n,'model_version':MODEL,'source_url':e['source_url'],'odds':None,'bookmaker':None,'price_kind':'Suggested line','observed_at':NOW.isoformat(),'sample':0,'flags':[],**extra}
+ identifier='|'.join(str(x) for x in (model_for(e['sport']),e['id'],extra.get('player_id','team'),market,extra.get('selection',''),side,line))
+ row={'id':identifier,'event_id':e['id'],'sport':e['sport'],'event':e['event'],'start':e['start'],'day':e['day'],'market':market,'side':side,'line':line,'projection':round(mu,2),'sd':round(sd,2),'raw_probability':round(raw,5),'probability':round(p,5),'fair_odds':fair(p),'calibration_key':key,'calibration_games':n,'model_version':model_for(e['sport']),'source_url':e['source_url'],'odds':None,'bookmaker':None,'price_kind':'Suggested line','observed_at':NOW.isoformat(),'sample':0,'flags':[],**extra}
  row['break_even']=round(implied(odds),5) if priced else None;row['edge_pp']=round((p-implied(odds))*100,2) if priced else None;row['expected_roi_pct']=round((p*dec(odds)-1)*100,2) if priced else None
  row['qualified']=bool(priced and n>=100 and row['sample']>=10 and row['edge_pp']>=3 and not row['flags'])
  row['gradeable']=True
@@ -397,10 +408,10 @@ def team_rows(events,e,history):
     v=g['home']['periods'][:count]+g['away']['periods'][:count]
     if all(x is not None for x in v):values.append(sum(v))
   if len(values)>=5:
-   mu=mean(values);sig=max(st.pstdev(values),3)
-   for side in ('Over','Under'):rows.append(make_row(e,period,side,math.floor(mu)+.5,mu,sig,history,selection=e['event'],sample=len(values),projection_evidence={'kind':'period','samples':values,'mean':mu,'sd':sig},flags=['Unvalidated period model']))
+   mu=mean(values)*e.get('weather',{}).get('scoring',1);sig=max(st.pstdev(values),3)
+   for side in ('Over','Under'):rows.append(make_row(e,period,side,math.floor(mu)+.5,mu,sig,history,selection=e['event'],sample=len(values),projection_evidence={'kind':'period','samples':values,'mean':mu,'sd':sig,'weather_adjustment':mu-mean(values)},flags=['Unvalidated period model']))
  for r in rows:
-  if 'projection_evidence' not in r:r['projection_evidence']={'kind':'team','home':hf,'away':af,'total':h+a,'home_margin':h-a,'formula':'Each team = (scoring average + opposing points allowed average) / 2 + rest adjustment + venue adjustment + eligible injury adjustment','limitations':['Fixed venue and rest coefficients are legacy assumptions, not fitted effects.','The injury adjustment uses recent offensive scoring splits where supported. Defensive returns and workload are shown as availability context.','The model is not prospectively validated.']}
+  if 'projection_evidence' not in r:r['projection_evidence']={'kind':'team','home':hf,'away':af,'total':h+a,'home_margin':h-a,'formula':'Each team = (scoring average + opposing points allowed average) / 2 + rest adjustment + venue adjustment + eligible injury adjustment, then kickoff weather scoring adjustment where available','limitations':['Fixed venue and rest coefficients are legacy assumptions, not fitted effects.','The injury adjustment uses recent offensive scoring splits where supported. Defensive returns and workload are shown as availability context.','The model is not prospectively validated.']}
  return rows
 
 BASKET={'Points':(5,1),'Rebounds':(2,1),'Assists':(2,1),'PRA':(5,1),'Points + rebounds':(5,1),'Points + assists':(5,1),'Rebounds + assists':(2,1),'Threes':(1,1),'Steals':(1,1),'Blocks':(1,1)}
@@ -458,11 +469,17 @@ def player_rows(events,e,box,injuries,history):
    if expected_minutes and abs(mean(mins[-3:])-mean(mins))>4:flag.append('Minutes volatility');sig*=1.15
    if flag and status.lower() not in ('not listed','active','available','probable'):sig*=1.2
    match=matchup.evaluate(games,records,events,e,e['sport'],market,latest['team_id'])
-   if e['sport'] in ('NFL','NCAAF') and market in matchup.FOOTBALL_ROLES:
-    position=next((g['position'] for g in reversed(games) if g['team_id']==latest['team_id'] and g.get('position')),None)
+   weather=e.get('weather',{})
+   position=next((g['position'] for g in reversed(games) if g['team_id']==latest['team_id'] and g.get('position')),None) if weather else None
+   if e['sport'] in football_weather.SPORTS and market in matchup.FOOTBALL_ROLES:
     match=matchup.football_matchup(games,records,events,e,market,latest['team_id'],position,match)
-   engine=actuarial.fit(games,records,e['sport'],market,pid,log_key,adjustment=match['multiplier'])
-   if engine:engine['evidence']['matchup_framework']=match
+   weather_volume,weather_rate=football_weather.market_factors(market,weather,position or '')
+   engine=actuarial.fit(games,records,e['sport'],market,pid,log_key,adjustment=match['multiplier'],weather_volume=weather_volume,weather_rate=weather_rate)
+   if engine:
+    engine['evidence']['matchup_framework']=match
+    if weather:engine['evidence']['kickoff_weather']={'status':weather['status'],'volume':weather_volume,'rate':weather_rate}
+   elif weather:
+    projection*=weather_volume*weather_rate
    if engine:
     projection=engine['projection'];sig=engine['sd'];rate=engine['evidence']['shrunk_rate'] if engine['evidence']['opportunity_unit']=='Minutes' else None;expected_minutes=engine['evidence']['expected_opportunity'] if engine['evidence']['opportunity_unit']=='Minutes' else None;PLAYER_LOGS[log_key]['model']=engine['evidence']
     defense=1 # Legacy ad-hoc defensive bonuses are not applied to this unvalidated engine.
@@ -480,7 +497,9 @@ def player_rows(events,e,box,injuries,history):
      if engine:
       estimates=actuarial.price(engine['evidence'],line,side,r.get('odds'));r.update(estimates);r['raw_probability']=r['probability'];r['calibration_games']=0
       r['engine_version']=actuarial.VERSION;r['model_status']='Research / unvalidated';r['qualified']=False
-      r['reasoning']=f"{engine['evidence']['expected_opportunity']} expected {engine['evidence']['opportunity_unit']} × {engine['evidence']['shrunk_rate']} production per opportunity. Scenario-mixture mean {projection:.2f}. Opponent rate adjustment: {match['status']} (multiplier {match['multiplier']:.3f}). Confirmed lineup and weather adjustments remain unavailable."
+      r['reasoning']=f"{engine['evidence']['expected_opportunity']} expected {engine['evidence']['opportunity_unit']} × {engine['evidence']['shrunk_rate']} production per opportunity. Scenario-mixture mean {projection:.2f}. Opponent rate adjustment: {match['status']} (multiplier {match['multiplier']:.3f}). Current lineup changes remain unmodeled."
+      if weather:
+       r['reasoning']+=f" Kickoff weather: {weather['status']}. Workload ×{weather_volume:.3f}; production rate ×{weather_rate:.3f}."
       if 'football_defense' in match:
        rate_label=f" {match['opportunity_unit']}"
        if match['opponent_rate'] is not None and match['league_rate'] is not None:
@@ -599,6 +618,7 @@ def main():
     first_scores[key]=first_touchdown(d,rows)
  write('cache.json',cache);write('events.json',events)
  injuries=collect_availability(future)
+ football_weather.collect(future,cache,fetch,parallel,NOW)
  write('cache.json',cache);write('events.json',events)
  for r in history+ai_ledger:
   if r.get('outcome') is not None:continue
@@ -619,14 +639,17 @@ def main():
  for e in future:
   e['availability_impact']=injury_impact(events,e,prediction_box,statuses[e['id']])
   rows+=team_rows(events,e,history);rows+=player_rows(events,e,prediction_box,injuries,history)
- learning=ai_record.calibration(ai_ledger,NOW.isoformat())
+ learning=ai_record.calibration(ai_ledger,NOW.isoformat(),model_for)
  for row in rows:ai_record.apply(row,learning)
- frozen_events={r['event_id'] for r in ai_ledger}
+ by_event=defaultdict(list)
+ for row in rows:by_event[row['event_id']].append(row)
+ current_football={}
  for fixture in future:
+  chosen=ai_record.choose(by_event[fixture['id']])
+  if fixture['sport'] in football_weather.SPORTS:current_football[fixture['id']]=chosen
   prior=[r for r in ai_ledger if r['event_id']==fixture['id']]
   if len(prior)>=10:continue
   prior_keys={('player',r['player_id']) if r.get('player_id') else ('market',r['market'],r.get('team_id','game')) for r in prior}
-  chosen=ai_record.choose([r for r in rows if r['event_id']==fixture['id']])
   chosen=[r for r in chosen if (('player',r['player_id']) if r.get('player_id') else ('market',r['market'],r.get('team_id','game'))) not in prior_keys][:10-len(prior)]
   for rank,r in enumerate(chosen,len(prior)+1):
    snapshot={k:v for k,v in r.items() if k not in ('context','recent_values')}
@@ -636,6 +659,7 @@ def main():
  active_ids={e['id'] for e in future}
  inactive={(r['event_id'],r['player_id']) for r in injuries if unavailable(r['status'])}
  ai_selections={eid:ai_record.choose([r for r in ai_ledger if r['event_id']==eid and (eid,r.get('player_id')) not in inactive]) for eid in active_ids}
+ ai_selections.update(current_football)
  ai_summary=ai_record.summarize(ai_ledger)
  write('ai_picks.json',ai_ledger)
  # Record one pregame forecast for each exact suggested line; never mutate it when refreshing.
@@ -651,7 +675,7 @@ def main():
  bins=[]
  for lo in (0,.5,.6,.7,.8,.9):
   hi=.5 if lo==0 else lo+.1;rs=[r for r in settled if lo<=r['probability']<hi];bins.append({'from':lo,'to':round(hi,2),'n':len(rs),'predicted':mean([r['probability'] for r in rs],None),'actual':mean([r['outcome'] for r in rs],None)})
- report={'ai_selections':ai_selections,'ai_record':ai_summary,'ai_learning':learning,'ai_recent_results':[{k:r.get(k) for k in ('event','sport','selection','market','side','line','probability','projection','actual_value','outcome','ai_selected_at','graded_at','flags')} for r in ai_ledger if r.get('outcome') is not None][-200:],'engine_monitoring':actuarial.monitoring(history,MODEL),'engine_status':{'version':actuarial.VERSION,'full_hierarchical_bayes':False,'full_game_simulation':False,'portfolio_optimizer':'Disabled: forecasts and joint returns not validated','coverage':'Player props with sufficient box-score data; game markets retain legacy scoring model; golf has no automatic model','method_reference':'https://mc-stan.org/docs/stan-users-guide/sampling-from-the-posterior-predictive-distribution.html'},'player_logs':PLAYER_LOGS,'version':MODEL,'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'refresh_minutes':15,'recommendations':rows,'games':future,'injuries':injuries,'metrics':{'tracked_predictions':len(history),'settled_predictions':len(settled),'won':sum(r['outcome'] for r in settled),'brier_score':round(brier,4) if brier is not None else None,'independent_groups':len(groups),'priced_settled':len(priced),'realized_roi_pct':round(100*sum(r['profit_units'] for r in priced)/len(priced),2) if priced else None},'calibration_bins':bins,'coverage':list(SPORTS),'source':'ESPN public scoreboards / boxscores / injury reports; DraftKings game odds where supplied by ESPN','errors':ERRORS,'backfill_remaining':max(0,len(needed)-len(target)),'limitations':['Player-prop prices are not provided by the free game feed. Suggested lines are model thresholds, not sportsbook offers.','Player props use deterministic opportunity/workload scenario models; game markets retain the legacy normal model. Probabilities are not validated.','Injury status and teammate absences are flags; confirmed rotations, player usage redistribution and position-specific defense are not modeled.','No automatic golf prediction or odds feed; exact markets can be imported locally.','Missing player participation remains pending for review, never automatically graded as a loss.']}
+ report={'ai_selections':ai_selections,'ai_record':ai_summary,'ai_learning':learning,'ai_recent_results':[{k:r.get(k) for k in ('event','sport','selection','market','side','line','probability','projection','actual_value','outcome','ai_selected_at','graded_at','flags')} for r in ai_ledger if r.get('outcome') is not None][-200:],'engine_monitoring':([r for r in actuarial.monitoring(history,BASE_MODEL) if r['sport'] not in football_weather.SPORTS]+actuarial.monitoring(history,MODEL)),'engine_status':{'version':actuarial.VERSION,'full_hierarchical_bayes':False,'full_game_simulation':False,'portfolio_optimizer':'Disabled: forecasts and joint returns not validated','coverage':'Player props with sufficient box-score data; game markets retain legacy scoring model; golf has no automatic model','method_reference':'https://mc-stan.org/docs/stan-users-guide/sampling-from-the-posterior-predictive-distribution.html'},'player_logs':PLAYER_LOGS,'version':MODEL,'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'refresh_minutes':15,'recommendations':rows,'games':future,'injuries':injuries,'metrics':{'tracked_predictions':len(history),'settled_predictions':len(settled),'won':sum(r['outcome'] for r in settled),'brier_score':round(brier,4) if brier is not None else None,'independent_groups':len(groups),'priced_settled':len(priced),'realized_roi_pct':round(100*sum(r['profit_units'] for r in priced)/len(priced),2) if priced else None},'calibration_bins':bins,'coverage':list(SPORTS),'source':'ESPN public scoreboards / boxscores / injury reports; DraftKings game odds where supplied by ESPN','errors':ERRORS,'backfill_remaining':max(0,len(needed)-len(target)),'limitations':['Player-prop prices are not provided by the free game feed. Suggested lines are model thresholds, not sportsbook offers.','Player props use deterministic opportunity/workload scenario models; game markets retain the legacy normal model. Probabilities are not validated.','Injury status and teammate absences are flags; confirmed rotations, player usage redistribution and position-specific defense are not modeled.','No automatic golf prediction or odds feed; exact markets can be imported locally.','Missing player participation remains pending for review, never automatically graded as a loss.']}
  report['calibration_tracking']=ai_record.track_calibration(ai_ledger)
  report['next_gen_audit']=nextgen.audit(TODAY,box,cache)
  write('cache.json',cache)
@@ -664,7 +688,7 @@ def main():
  write('history-view.json',feed_transport.history_view(history))
  write('pick-record.json',feed_transport.history_view(ai_ledger))
  write('latest.json',feed_transport.compact(report,DATA/'details'))
- write('status.json',{'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'version':MODEL,'refresh_minutes':15,'transport_version':3,'games':len(future),'recommendations':len(rows),'source_errors':len(ERRORS)})
+ write('status.json',{'generated_at':NOW.isoformat(),'day':TODAY.isoformat(),'version':MODEL,'refresh_minutes':15,'transport_version':3,'games':len(future),'recommendations':len(rows),'source_errors':len(ERRORS),'football_weather':{status:sum(e.get('weather',{}).get('status')==status for e in future) for status in sorted({e['weather']['status'] for e in future if 'weather' in e})}})
  print(f'{len(future)} upcoming games | {len(rows)} lines | {sum(bool(r.get("player_id")) for r in rows)} player lines | {len(settled)} settled | {len(ERRORS)} feed errors')
 if __name__=='__main__':main()
 

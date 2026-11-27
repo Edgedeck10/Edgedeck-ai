@@ -18,10 +18,10 @@ def choose(rows):
   if len(result)==10:break
  return result
 
-def calibration(ledger,before):
+def calibration(ledger,before,model_for=lambda sport: 'opportunity-4.2.0'):
  groups=defaultdict(list)
  for r in ledger:
-  if r.get('outcome') in (0,1) and r.get('graded_at','')<before and r.get('model_version')=='opportunity-4.2.0':groups[(r['sport'],r['market'])].append(r)
+  if r.get('outcome') in (0,1) and r.get('graded_at','')<before and r.get('model_version')==model_for(r['sport']):groups[(r['sport'],r['market'])].append(r)
  output={}
  for (sport,market),rs in groups.items():
   rs.sort(key=lambda r:r['start']);days=sorted(set(r['start'][:10] for r in rs));applied=0.;train_n=0;hold_n=0;raw=None;adjusted=None;raw_log=None;adjusted_log=None
